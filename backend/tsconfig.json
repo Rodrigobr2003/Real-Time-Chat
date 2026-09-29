@@ -3,8 +3,8 @@
     "target": "es2023",
     "lib": ["ES2023"],
     "types": ["node"],
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "rootDir": "src",
     "outDir": "dist",
     "strict": true,
@@ -13,10 +13,25 @@
     "resolveJsonModule": true,
     "sourceMap": true,
 
+    "paths": {
+      "@config/*": ["./src/config/*"],
+      "@controllers/*": ["./src/controllers/*"],
+      "@routes/*": ["./src/routes/*"],
+      "@services/*": ["./src/services/*"],
+      "@models/*": ["./src/models/*"],
+      "@middlewares/*": ["./src/middlewares/*"],
+      "@sockets/*": ["./src/sockets/*"],
+      "@utils/*": ["./src/utils/*"],
+      "@typings/*": ["./src/types/*"]
+    },
+
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "tsc-alias": {
+    "resolveFullPaths": true
+  }
 }
