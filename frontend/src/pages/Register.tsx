@@ -16,6 +16,7 @@ import { PasswordInput } from "../components/ui/PasswordInput";
 export default function Register() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -45,6 +46,17 @@ export default function Register() {
               autoFocus
             />
           </Label>
+
+          <Label>
+            E-mail
+            <Input
+              placeholder="Ex: Máquina A"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoFocus
+            />
+          </Label>
+
           <Label>
             Senha
             <PasswordInput

@@ -6,20 +6,23 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import { GlobalStyle } from "./styles/GlobalStyle";
 import { theme } from "./styles/theme";
+import { GlobalContexts } from "./context/globalContexts";
 
 function App() {
   return (
     <ThemeProvider theme={theme}>
       <GlobalStyle />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/home" element={<Home />} />
-          <Route path="/chat/:roomId" element={<Chat />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+      <GlobalContexts>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/home" element={<Home />} />
+            <Route path="/chat/:roomId" element={<Chat />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </GlobalContexts>
     </ThemeProvider>
   );
 }
