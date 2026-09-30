@@ -1,6 +1,14 @@
 import { createContext } from "react";
+import type { UseMutateFunction } from "@tanstack/react-query";
+import type { IPublicUser, IUserDTO } from "../model/userModel";
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface IUserContext {}
+export interface IUserContext {
+  userDTO: IUserDTO;
+  applyDTOChanges: (field: string, value: string) => void;
+  clearDTOFields: () => void;
+  createUserMutation: UseMutateFunction<IPublicUser, Error, IUserDTO>;
+  isCreationPending: boolean;
+  creationError: boolean;
+}
 
 export const UserContext = createContext<IUserContext | null>(null);
