@@ -1,6 +1,7 @@
 import { UserModel } from "@models/userSchema";
 import { ConflictError } from "@errors/ConflictError";
 import type { NewUser, PublicUser } from "@typings/user";
+import { toPublicUser } from "@utils/serviceResponse";
 
 // Contrato: o service depende disto, não do Mongoose.
 export interface IUserRepository {
@@ -8,24 +9,6 @@ export interface IUserRepository {
   findByUsername(user: string): Promise<PublicUser | null>;
   save(data: NewUser): Promise<PublicUser>;
 }
-
-type UserDoc = {
-  _id: { toString(): string };
-  accountId: string;
-  name: string;
-  user: string;
-  email: string;
-  createdAt: Date;
-};
-
-const toPublicUser = (doc: UserDoc): PublicUser => ({
-  id: doc._id.toString(),
-  accountId: doc.accountId,
-  name: doc.name,
-  user: doc.user,
-  email: doc.email,
-  createdAt: doc.createdAt,
-});
 
 export class MongoUserRepository implements IUserRepository {
   async findByEmail(email: string) {

@@ -1,3 +1,12 @@
+export type UserDoc = {
+  _id: { toString(): string };
+  accountId: string;
+  name: string;
+  user: string;
+  email: string;
+  createdAt: Date;
+};
+
 export interface CreateUserInput {
   name: string;
   user: string;
