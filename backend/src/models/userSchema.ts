@@ -57,7 +57,6 @@ const UserSchema = new Schema(
     passwordHash: {
       type: String,
       required: [true, "A senha é obrigatória"],
-      minLength: [8, "A senha deve ter no mínimo 8 caracteres"],
       select: false,
     },
     description: {

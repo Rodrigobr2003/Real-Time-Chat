@@ -1,11 +1,10 @@
-import { Router } from "express";
-import express from "express";
+import { Router, type Application } from "express";
 
 const router = Router();
 
-router.post("/login", (res: Response) => {
+router.post("/login", (_req, res) => {
   res.status(501).json({ message: "Not implemented" });
 });
 
-export default (app: express.Application, versionPrefix: string) =>
+export default (app: Application, versionPrefix: string) =>
   app.use(`${versionPrefix}auth`, router);
