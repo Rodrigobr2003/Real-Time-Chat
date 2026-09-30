@@ -1,6 +1,8 @@
+import { useMutation } from "@tanstack/react-query";
 import { MessageCircle } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { manualLogin } from "../api/auth";
 import { Button } from "../components/ui/Button";
 import {
   Card,
@@ -10,17 +12,26 @@ import {
   Form,
   Logo,
 } from "../components/ui/Card";
-import { Input, Label } from "../components/ui/Input";
+import { FieldError, Input, Label } from "../components/ui/Input";
 import { PasswordInput } from "../components/ui/PasswordInput";
+import { getApiErrors } from "../utils/apiErrors";
 
 export default function Login() {
   const navigate = useNavigate();
-  const [name, setName] = useState("");
+  const [userOrEmail, setUserOrEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  const { mutate: login, isPending } = useMutation({
+    mutationFn: manualLogin,
+    onSuccess: () => navigate("/home", { replace: true }),
+    onError: (err) => setError(getApiErrors(err).message),
+  });
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    navigate("/home");
+    setError("");
+    login({ userOrEmail: userOrEmail.trim(), password });
   }
 
   return (
@@ -36,11 +47,14 @@ export default function Login() {
 
         <Form onSubmit={handleSubmit}>
           <Label>
-            Usuário
+            Usuário ou e-mail
             <Input
-              placeholder="Ex: Máquina A"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
+              placeholder="Seu usuário ou e-mail"
+              value={userOrEmail}
+              onChange={(event) => {
+                setUserOrEmail(event.target.value);
+                setError("");
+              }}
               autoFocus
             />
           </Label>
@@ -49,11 +63,21 @@ export default function Login() {
             <PasswordInput
               placeholder="Sua senha"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                setError("");
+              }}
             />
           </Label>
-          <Button type="submit" $fullWidth disabled={!name.trim() || !password}>
-            Entrar
+
+          {error && <FieldError role="alert">{error}</FieldError>}
+
+          <Button
+            type="submit"
+            $fullWidth
+            disabled={!userOrEmail.trim() || !password || isPending}
+          >
+            {isPending ? "Entrando..." : "Entrar"}
           </Button>
         </Form>
 
