@@ -9,6 +9,8 @@ export interface IUserContext {
   createUserMutation: UseMutateFunction<IPublicUser, Error, IUserDTO>;
   isCreationPending: boolean;
   creationError: boolean;
+  logoutMutation: UseMutateFunction<void, Error, void>;
+  isLogoutPending: boolean;
 }
 
 export const UserContext = createContext<IUserContext | null>(null);

@@ -11,6 +11,7 @@ type ProfileTabProps = {
   profile: Profile;
   onSave: (profile: Profile) => void;
   onLogout: () => void;
+  isLoggingOut?: boolean;
 };
 
 const Wrapper = styled.div`
@@ -171,7 +172,12 @@ const LogoutButton = styled(Button)`
   }
 `;
 
-export function ProfileTab({ profile, onSave, onLogout }: ProfileTabProps) {
+export function ProfileTab({
+  profile,
+  onSave,
+  onLogout,
+  isLoggingOut = false,
+}: ProfileTabProps) {
   const [isEditing, setIsEditing] = useState(false);
   const statusLabel = STATUS_OPTIONS.find((option) => option.value === profile.status)?.label;
 
@@ -238,9 +244,14 @@ export function ProfileTab({ profile, onSave, onLogout }: ProfileTabProps) {
         </li>
       </InfoList>
 
-      <LogoutButton $variant="ghost" $fullWidth onClick={onLogout}>
+      <LogoutButton
+        $variant="ghost"
+        $fullWidth
+        onClick={onLogout}
+        disabled={isLoggingOut}
+      >
         <LogOut size={18} />
-        Sair da conta
+        {isLoggingOut ? "Saindo..." : "Sair da conta"}
       </LogoutButton>
 
       {isEditing && (
