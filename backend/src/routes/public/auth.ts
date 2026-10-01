@@ -13,4 +13,4 @@ const router = Router();
 router.post("/login", controller.login);
 
 export default (app: Application, versionPrefix: string) =>
-  app.use(`${versionPrefix}auth`, router);
+  app.use(`${versionPrefix}auth/public`, router);

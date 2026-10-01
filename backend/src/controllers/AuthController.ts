@@ -2,6 +2,12 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import { UnauthorizedError } from "@errors/UnauthorizedError";
 import type { AuthService } from "@services/AuthService";
+import {
+  signToken,
+  TOKEN_COOKIE,
+  TOKEN_MAX_AGE_MS,
+  tokenCookieOptions,
+} from "@utils/jwt";
 
 const loginSchema = z.object({
   userOrEmail: z.string().trim().min(1, "Informe o usuário ou e-mail"),
@@ -23,6 +29,13 @@ export class AuthController {
     try {
       const user = await this.authService.login(parsed.data);
 
+      const token = signToken(user.id);
+
+      res.cookie(TOKEN_COOKIE, token, {
+        ...tokenCookieOptions,
+        maxAge: TOKEN_MAX_AGE_MS,
+      });
+
       return res.status(200).json(user);
     } catch (err) {
       if (err instanceof UnauthorizedError) {
@@ -32,5 +45,11 @@ export class AuthController {
       console.error(err);
       return res.status(500).json({ message: "Erro interno do servidor" });
     }
+  };
+
+  logout = (_req: Request, res: Response) => {
+    res.clearCookie(TOKEN_COOKIE, tokenCookieOptions);
+
+    return res.status(204).end();
   };
 }
