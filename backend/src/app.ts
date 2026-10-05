@@ -1,10 +1,7 @@
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 import { createServer } from "@services/express";
 import http from "http";
 import { AddressInfo } from "net";
-
-dotenv.config();
 
 const host = process.env.HOST || "0.0.0.0";
 const port = process.env.PORT || 8800;
@@ -14,6 +11,10 @@ async function startServer() {
 
   if (!MONGO_URI) {
     throw new Error("MONGO_URI não definida no .env");
+  }
+
+  if (!process.env.JWT_SECRET) {
+    throw new Error("JWT_SECRET não definida no .env");
   }
 
   await mongoose.connect(MONGO_URI);

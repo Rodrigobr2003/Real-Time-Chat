@@ -1,8 +1,6 @@
-import { useMutation } from "@tanstack/react-query";
 import { MessageCircle } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { manualLogin } from "../api/auth";
 import { Button } from "../components/ui/Button";
 import {
   Card,
@@ -14,6 +12,7 @@ import {
 } from "../components/ui/Card";
 import { FieldError, Input, Label } from "../components/ui/Input";
 import { PasswordInput } from "../components/ui/PasswordInput";
+import { useAuth } from "../hooks/useAuth";
 import { getApiErrors } from "../utils/apiErrors";
 
 export default function Login() {
@@ -22,16 +21,18 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const { mutate: login, isPending } = useMutation({
-    mutationFn: manualLogin,
-    onSuccess: () => navigate("/home", { replace: true }),
-    onError: (err) => setError(getApiErrors(err).message),
-  });
+  const { loginMutation, isLoginPending: isPending } = useAuth();
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError("");
-    login({ userOrEmail: userOrEmail.trim(), password });
+    loginMutation(
+      { userOrEmail: userOrEmail.trim(), password },
+      {
+        onSuccess: () => navigate("/home", { replace: true }),
+        onError: (err) => setError(getApiErrors(err).message),
+      },
+    );
   }
 
   return (
