@@ -6,7 +6,9 @@ import { ProfileTab } from "../components/profile/ProfileTab";
 import { RoomsTab } from "../components/rooms/RoomsTab";
 import { Card, CenteredPage } from "../components/ui/Card";
 import { Tab, Tabs } from "../components/ui/Tabs";
-import { mockProfile } from "../mocks/profile";
+import { useAuth } from "../hooks/useAuth";
+import type { IPublicUser } from "../model/userModel";
+import { mockProfile, type Profile } from "../mocks/profile";
 
 type HomeTab = "rooms" | "profile";
 
@@ -16,10 +18,33 @@ const HomeCard = styled(Card)`
   gap: 20px;
 `;
 
+// O backend ainda só tem nome, usuário, e-mail e data de criação.
+// O resto (bio, status, cor, estatísticas) continua vindo do mock.
+const toProfile = (user: IPublicUser | null): Profile =>
+  user
+    ? {
+        ...mockProfile,
+        name: user.name,
+        username: user.user,
+        email: user.email,
+        memberSince: new Date(user.createdAt).toLocaleDateString("pt-BR", {
+          month: "long",
+          year: "numeric",
+        }),
+      }
+    : mockProfile;
+
 export default function Home() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<HomeTab>("rooms");
-  const [profile, setProfile] = useState(mockProfile);
+  const { user, logoutMutation, isLogoutPending } = useAuth();
+  const [profile, setProfile] = useState(() => toProfile(user));
+
+  function handleLogout() {
+    logoutMutation(undefined, {
+      onSuccess: () => navigate("/", { replace: true }),
+    });
+  }
 
   return (
     <CenteredPage>
@@ -48,7 +73,12 @@ export default function Home() {
         {activeTab === "rooms" ? (
           <RoomsTab />
         ) : (
-          <ProfileTab profile={profile} onSave={setProfile} onLogout={() => navigate("/")} />
+          <ProfileTab
+            profile={profile}
+            onSave={setProfile}
+            onLogout={handleLogout}
+            isLoggingOut={isLogoutPending}
+          />
         )}
       </HomeCard>
     </CenteredPage>

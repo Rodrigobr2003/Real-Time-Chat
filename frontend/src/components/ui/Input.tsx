@@ -44,3 +44,8 @@ export const FieldHint = styled.span`
   font-size: 12px;
   color: ${({ theme }) => theme.colors.textMuted};
 `;
+
+export const FieldError = styled.span`
+  font-size: 12px;
+  color: ${({ theme }) => theme.colors.danger};
+`;
