@@ -1,9 +1,8 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { UserContext, type IUserContext } from "./userContextInstance";
 import type { IUserDTO } from "../model/userModel";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { createUser } from "../api/userHelpers";
-import { logout } from "../api/auth";
 
 interface IUserProvider {
   children: ReactNode;
@@ -17,7 +16,6 @@ const INITIAL_USER: IUserDTO = {
 };
 
 export const UserProvider = ({ children }: IUserProvider) => {
-  const queryClient = useQueryClient();
   const [userDTO, setUserDTO] = useState<IUserDTO>(INITIAL_USER);
 
   const applyDTOChanges = useCallback(
@@ -42,12 +40,6 @@ export const UserProvider = ({ children }: IUserProvider) => {
     onSuccess: () => clearDTOFields(),
   });
 
-  const { mutate: logoutMutation, isPending: isLogoutPending } = useMutation({
-    mutationFn: logout,
-    // Limpa o cache do React Query para não sobrar dado do usuário anterior.
-    onSuccess: () => queryClient.clear(),
-  });
-
   const value = useMemo<IUserContext>(
     () => ({
       userDTO,
@@ -56,8 +48,6 @@ export const UserProvider = ({ children }: IUserProvider) => {
       createUserMutation,
       isCreationPending,
       creationError,
-      logoutMutation,
-      isLogoutPending,
     }),
     [
       userDTO,
@@ -66,8 +56,6 @@ export const UserProvider = ({ children }: IUserProvider) => {
       createUserMutation,
       isCreationPending,
       creationError,
-      logoutMutation,
-      isLogoutPending,
     ],
   );
 

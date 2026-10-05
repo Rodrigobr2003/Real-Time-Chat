@@ -18,16 +18,18 @@ export const manualLogin = async (loginDTO: ILoginDTO) => {
   return data;
 };
 
-export const loginWithToken = async (token: string) => {
-  const { data } = await api.post<IPublicUser>(
-    `${PRIVATE_AUTH_DEFAULT_PATH}/login`,
-    token,
+export const getMe = async () => {
+  const { data } = await api.get<IPublicUser>(
+    `${PRIVATE_AUTH_DEFAULT_PATH}/me`,
   );
 
   return data;
 };
 
-// O backend responde 204 (sem corpo): só apaga o cookie.
+export const refreshSession = async () => {
+  await api.post(`${PUBLIC_AUTH_DEFAULT_PATH}/refresh`);
+};
+
 export const logout = async () => {
   await api.post(`${PRIVATE_AUTH_DEFAULT_PATH}/logout`);
 };
