@@ -1,7 +1,13 @@
 import { hash, Algorithm } from "@node-rs/argon2";
 import { ConflictError } from "@errors/ConflictError";
+import { UnauthorizedError } from "@errors/UnauthorizedError";
 import type { IUserRepository } from "@repositories/UserRepository";
-import type { CreateUserInput, PublicUser } from "@typings/user";
+import type {
+  CreateUserInput,
+  PublicUser,
+  UpdateUserInput,
+} from "@typings/user";
+import { compressUserPhoto } from "@utils/image";
 
 export class UserService {
   constructor(private readonly userRepository: IUserRepository) {}
@@ -25,5 +31,35 @@ export class UserService {
       email: input.email,
       passwordHash,
     });
+  }
+
+  async updateUser(
+    userId: string,
+    input: UpdateUserInput,
+  ): Promise<PublicUser> {
+    if (input.email) {
+      const found = await this.userRepository.findByEmail(input.email);
+      if (found && found.id !== userId) {
+        throw new ConflictError("Email já cadastrado");
+      }
+    }
+
+    if (input.user) {
+      const found = await this.userRepository.findByUsername(input.user);
+      if (found && found.id !== userId) {
+        throw new ConflictError("Nome de usuário já cadastrado");
+      }
+    }
+
+    const updated = await this.userRepository.update(userId, {
+      ...input,
+      ...(input.userPhoto && {
+        userPhoto: await compressUserPhoto(input.userPhoto),
+      }),
+    });
+
+    if (!updated) throw new UnauthorizedError("Usuário não encontrado");
+
+    return updated;
   }
 }

@@ -1,13 +1,18 @@
 import { UserModel } from "@models/userSchema";
 import { ConflictError } from "@errors/ConflictError";
-import type { NewUser, PublicUser } from "@typings/user";
+import type { NewUser, PublicUser, UpdateUserInput } from "@typings/user";
 import { toPublicUser } from "@utils/serviceResponse";
 
-// Contrato: o service depende disto, não do Mongoose.
+const DUPLICATE_KEY_CODE = 11000;
+
+const isDuplicateKeyError = (err: unknown) =>
+  (err as { code?: number }).code === DUPLICATE_KEY_CODE;
+
 export interface IUserRepository {
   findByEmail(email: string): Promise<PublicUser | null>;
   findByUsername(user: string): Promise<PublicUser | null>;
   save(data: NewUser): Promise<PublicUser>;
+  update(id: string, data: UpdateUserInput): Promise<PublicUser | null>;
 }
 
 export class MongoUserRepository implements IUserRepository {
@@ -29,7 +34,24 @@ export class MongoUserRepository implements IUserRepository {
 
       return toPublicUser(doc);
     } catch (err) {
-      if ((err as { code?: number }).code === 11000) {
+      if (isDuplicateKeyError(err)) {
+        throw new ConflictError("Email ou nome de usuário já cadastrado");
+      }
+      throw err;
+    }
+  }
+
+  async update(id: string, data: UpdateUserInput) {
+    try {
+      const doc = await UserModel.findByIdAndUpdate(
+        id,
+        { $set: data },
+        { new: true, runValidators: true },
+      ).lean();
+
+      return doc ? toPublicUser(doc) : null;
+    } catch (err) {
+      if (isDuplicateKeyError(err)) {
         throw new ConflictError("Email ou nome de usuário já cadastrado");
       }
       throw err;

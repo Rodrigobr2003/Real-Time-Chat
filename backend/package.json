@@ -13,6 +13,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.3.0",
     "@types/node": "^24.13.3",
     "tsc-alias": "^1.9.5",
     "tsx": "^4.23.15",
@@ -28,6 +29,8 @@
     "jsonwebtoken": "^9.0.3",
     "mongodb": "^7.7.0",
     "mongoose": "^9.10.3",
+    "multer": "^2.4.0",
+    "sharp": "^0.35.5",
     "zod": "^4.6.5"
   }
 }
