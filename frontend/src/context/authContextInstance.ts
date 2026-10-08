@@ -3,6 +3,8 @@ import type { UseMutateFunction } from "@tanstack/react-query";
 import type { ILoginDTO } from "../api/auth";
 import type { IPublicUser } from "../model/userModel";
 
+export const ME_QUERY_KEY = ["me"] as const;
+
 export interface IAuthContext {
   user: IPublicUser | null;
   isCheckingSession: boolean;

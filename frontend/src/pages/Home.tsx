@@ -18,8 +18,6 @@ const HomeCard = styled(Card)`
   gap: 20px;
 `;
 
-// O backend ainda só tem nome, usuário, e-mail e data de criação.
-// O resto (bio, status, cor, estatísticas) continua vindo do mock.
 const toProfile = (user: IPublicUser | null): Profile =>
   user
     ? {
@@ -27,6 +25,10 @@ const toProfile = (user: IPublicUser | null): Profile =>
         name: user.name,
         username: user.user,
         email: user.email,
+        bio: user.description,
+        status: user.status,
+        accentColor: user.profileBgColor,
+        photoURL: user.userPhotoURL,
         memberSince: new Date(user.createdAt).toLocaleDateString("pt-BR", {
           month: "long",
           year: "numeric",
@@ -38,7 +40,7 @@ export default function Home() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<HomeTab>("rooms");
   const { user, logoutMutation, isLogoutPending } = useAuth();
-  const [profile, setProfile] = useState(() => toProfile(user));
+  const profile = toProfile(user);
 
   function handleLogout() {
     logoutMutation(undefined, {
@@ -75,7 +77,6 @@ export default function Home() {
         ) : (
           <ProfileTab
             profile={profile}
-            onSave={setProfile}
             onLogout={handleLogout}
             isLoggingOut={isLogoutPending}
           />

@@ -1,4 +1,6 @@
-export type UserStatus = "online" | "away" | "busy" | "offline";
+import { PROFILE_BG_COLORS, type UserStatus } from "../model/userModel";
+
+export type { UserStatus };
 
 export type Profile = {
   name: string;
@@ -7,6 +9,7 @@ export type Profile = {
   email: string;
   status: UserStatus;
   accentColor: string;
+  photoURL: string | null;
   machine: string;
   memberSince: string;
   stats: {
@@ -18,12 +21,12 @@ export type Profile = {
 
 export const STATUS_OPTIONS: { value: UserStatus; label: string }[] = [
   { value: "online", label: "Online" },
-  { value: "away", label: "Ausente" },
+  { value: "absent", label: "Ausente" },
   { value: "busy", label: "Ocupado" },
-  { value: "offline", label: "Invisível" },
+  { value: "invisible", label: "Invisível" },
 ];
 
-export const ACCENT_COLORS = ["#6c5ce7", "#00b894", "#0984e3", "#e84393", "#e17055", "#fdcb6e"];
+export const ACCENT_COLORS = PROFILE_BG_COLORS;
 
 export const mockProfile: Profile = {
   name: "Máquina A",
@@ -32,6 +35,7 @@ export const mockProfile: Profile = {
   email: "maquina.a@rede.local",
   status: "online",
   accentColor: "#6c5ce7",
+  photoURL: null,
   machine: "DESKTOP-01 · 192.168.0.12",
   memberSince: "Setembro de 2026",
   stats: {

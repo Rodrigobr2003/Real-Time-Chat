@@ -1,26 +1,35 @@
 import { Camera, Check, Trash2 } from "lucide-react";
-import { useState, type FormEvent } from "react";
-import styled from "styled-components";
 import {
-  ACCENT_COLORS,
-  STATUS_OPTIONS,
-  type Profile,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
+import styled from "styled-components";
+import { useUserUpdate } from "../../hooks/useUserUpdate";
+import { ACCENT_COLORS, STATUS_OPTIONS } from "../../mocks/profile";
+import {
+  USER_PHOTO_ACCEPTED_TYPES,
+  USER_PHOTO_MAX_SIZE,
+  type IUserProfileFields,
   type UserStatus,
-} from "../../mocks/profile";
+} from "../../model/userModel";
 import { getStatusColor } from "../../styles/status";
+import { getApiErrors } from "../../utils/apiErrors";
 import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/Button";
 import { Form } from "../ui/Card";
-import { FieldHint, Input, Label, Textarea } from "../ui/Input";
+import { FieldError, FieldHint, Input, Label, Textarea } from "../ui/Input";
 import { Modal } from "../ui/Modal";
 
-const BIO_MAX_LENGTH = 160;
+const BIO_MAX_LENGTH = 280;
 
 type EditProfileModalProps = {
-  profile: Profile;
   onClose: () => void;
-  onSave: (profile: Profile) => void;
 };
+
+type FieldErrors = Partial<Record<keyof IUserProfileFields, string>>;
 
 const PhotoRow = styled.div`
   display: flex;
@@ -84,10 +93,12 @@ const StatusOption = styled.button<{ $active: boolean; $status: UserStatus }>`
   font-size: 13px;
   font-weight: 600;
   border: 1px solid
-    ${({ $active, theme }) => ($active ? theme.colors.primary : theme.colors.border)};
+    ${({ $active, theme }) =>
+      $active ? theme.colors.primary : theme.colors.border};
   background: ${({ $active, theme }) =>
     $active ? "rgba(108, 92, 231, 0.12)" : theme.colors.surfaceAlt};
-  color: ${({ $active, theme }) => ($active ? theme.colors.text : theme.colors.textMuted)};
+  color: ${({ $active, theme }) =>
+    $active ? theme.colors.text : theme.colors.textMuted};
 
   &::before {
     content: "";
@@ -113,7 +124,8 @@ const Swatch = styled.button<{ $color: string; $active: boolean }>`
   border-radius: 50%;
   background: ${({ $color }) => $color};
   color: #fff;
-  outline: 2px solid ${({ $active, theme }) => ($active ? theme.colors.text : "transparent")};
+  outline: 2px solid
+    ${({ $active, theme }) => ($active ? theme.colors.text : "transparent")};
   outline-offset: 2px;
   transition: transform 0.15s;
 
@@ -131,38 +143,141 @@ const Actions = styled.div`
   }
 `;
 
-export function EditProfileModal({ profile, onClose, onSave }: EditProfileModalProps) {
-  const [draft, setDraft] = useState(profile);
+export function EditProfileModal({ onClose }: EditProfileModalProps) {
+  const {
+    updateDTO: draft,
+    applyUpdateChanges,
+    changedFields,
+    hasChanges,
+    resetUpdateDTO,
+    updateUserMutation,
+    isUpdatePending,
+  } = useUserUpdate();
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [formError, setFormError] = useState("");
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [filePreviewURL, setFilePreviewURL] = useState<string | null>(null);
+  const filePreviewRef = useRef<string | null>(null);
 
-  function update<K extends keyof Profile>(key: K, value: Profile[K]) {
-    setDraft((current) => ({ ...current, [key]: value }));
+  const photoPreview =
+    draft.userPhoto instanceof File ? filePreviewURL : draft.userPhoto;
+
+  useEffect(
+    () => () => {
+      if (filePreviewRef.current) URL.revokeObjectURL(filePreviewRef.current);
+    },
+    [],
+  );
+
+  function setFilePreview(file: File) {
+    if (filePreviewRef.current) URL.revokeObjectURL(filePreviewRef.current);
+
+    const url = URL.createObjectURL(file);
+    filePreviewRef.current = url;
+    setFilePreviewURL(url);
+  }
+
+  function update<K extends keyof IUserProfileFields>(
+    key: K,
+    value: IUserProfileFields[K],
+  ) {
+    applyUpdateChanges(key, value);
+    setErrors((current) => ({ ...current, [key]: undefined }));
+  }
+
+  function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    if (!(USER_PHOTO_ACCEPTED_TYPES as readonly string[]).includes(file.type)) {
+      return setErrors((current) => ({
+        ...current,
+        userPhoto: "Use uma imagem JPG, PNG ou WEBP",
+      }));
+    }
+
+    if (file.size > USER_PHOTO_MAX_SIZE) {
+      return setErrors((current) => ({
+        ...current,
+        userPhoto: "A imagem deve ter no máximo 5 MB",
+      }));
+    }
+
+    setFilePreview(file);
+    update("userPhoto", file);
+  }
+
+  function handleClose() {
+    resetUpdateDTO();
+    onClose();
   }
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    onSave(draft);
+    setFormError("");
+
+    if (!hasChanges) return handleClose();
+
+    updateUserMutation(changedFields, {
+      onSuccess: onClose,
+      onError: (error) => {
+        const { message, fields } = getApiErrors(error);
+
+        if (fields && Object.keys(fields).length > 0) setErrors(fields);
+        else setFormError(message);
+      },
+    });
   }
 
   return (
-    <Modal title="Editar perfil" open onClose={onClose}>
+    <Modal title="Editar perfil" open onClose={handleClose}>
       <Form onSubmit={handleSubmit}>
         <PhotoRow>
-          <Avatar size={64} status={draft.status} color={draft.accentColor} />
+          <Avatar
+            size={64}
+            src={photoPreview ?? undefined}
+            status={draft.status}
+            color={draft.profileBgColor}
+          />
           <div>
-            <SmallButton type="button" $variant="ghost">
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept={USER_PHOTO_ACCEPTED_TYPES.join(",")}
+              onChange={handlePhotoChange}
+              hidden
+            />
+            <SmallButton
+              type="button"
+              $variant="ghost"
+              onClick={() => photoInputRef.current?.click()}
+            >
               <Camera size={16} />
               Alterar foto
             </SmallButton>
-            <SmallButton type="button" $variant="ghost">
+            <SmallButton
+              type="button"
+              $variant="ghost"
+              onClick={() => update("userPhoto", null)}
+              disabled={!draft.userPhoto}
+            >
               <Trash2 size={16} />
               Remover
             </SmallButton>
           </div>
         </PhotoRow>
+        {errors.userPhoto && <FieldError>{errors.userPhoto}</FieldError>}
 
         <Label>
           Nome de exibição
-          <Input value={draft.name} onChange={(event) => update("name", event.target.value)} />
+          <Input
+            value={draft.name}
+            onChange={(event) => update("name", event.target.value)}
+            aria-invalid={!!errors.name}
+          />
+          {errors.name && <FieldError>{errors.name}</FieldError>}
         </Label>
 
         <Label>
@@ -170,25 +285,31 @@ export function EditProfileModal({ profile, onClose, onSave }: EditProfileModalP
           <UsernameField>
             <span>@</span>
             <Input
-              value={draft.username}
+              value={draft.user}
               onChange={(event) =>
-                update("username", event.target.value.replace(/\s/g, "").toLowerCase())
+                update(
+                  "user",
+                  event.target.value.replace(/\s/g, "").toLowerCase(),
+                )
               }
+              aria-invalid={!!errors.user}
             />
           </UsernameField>
+          {errors.user && <FieldError>{errors.user}</FieldError>}
         </Label>
 
         <Label>
           Descrição
           <Textarea
-            value={draft.bio}
+            value={draft.description}
             maxLength={BIO_MAX_LENGTH}
             placeholder="Conte um pouco sobre esta máquina..."
-            onChange={(event) => update("bio", event.target.value)}
+            onChange={(event) => update("description", event.target.value)}
           />
           <FieldHint>
-            {draft.bio.length}/{BIO_MAX_LENGTH}
+            {draft.description.length}/{BIO_MAX_LENGTH}
           </FieldHint>
+          {errors.description && <FieldError>{errors.description}</FieldError>}
         </Label>
 
         <Label>
@@ -197,7 +318,9 @@ export function EditProfileModal({ profile, onClose, onSave }: EditProfileModalP
             type="email"
             value={draft.email}
             onChange={(event) => update("email", event.target.value)}
+            aria-invalid={!!errors.email}
           />
+          {errors.email && <FieldError>{errors.email}</FieldError>}
         </Label>
 
         <Group>
@@ -225,22 +348,27 @@ export function EditProfileModal({ profile, onClose, onSave }: EditProfileModalP
                 key={color}
                 type="button"
                 $color={color}
-                $active={draft.accentColor === color}
-                onClick={() => update("accentColor", color)}
+                $active={draft.profileBgColor === color}
+                onClick={() => update("profileBgColor", color)}
                 aria-label={`Cor ${color}`}
               >
-                {draft.accentColor === color && <Check size={16} />}
+                {draft.profileBgColor === color && <Check size={16} />}
               </Swatch>
             ))}
           </Swatches>
         </Group>
 
+        {formError && <FieldError>{formError}</FieldError>}
+
         <Actions>
-          <Button type="button" $variant="ghost" onClick={onClose}>
+          <Button type="button" $variant="ghost" onClick={handleClose}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={!draft.name.trim() || !draft.username}>
-            Salvar
+          <Button
+            type="submit"
+            disabled={isUpdatePending || !draft.name.trim() || !draft.user}
+          >
+            {isUpdatePending ? "Salvando..." : "Salvar"}
           </Button>
         </Actions>
       </Form>
