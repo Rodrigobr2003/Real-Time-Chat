@@ -2,6 +2,7 @@ import type React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "./authContext";
 import { UserProvider } from "./userContex";
+import { UserUpdateProvider } from "./userUpdateContext";
 
 interface IGlobalContexts {
   children: React.ReactNode;
@@ -14,7 +15,9 @@ export const GlobalContexts = ({ children }: IGlobalContexts) => {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <UserProvider>{children}</UserProvider>
+        <UserProvider>
+          <UserUpdateProvider>{children}</UserUpdateProvider>
+        </UserProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

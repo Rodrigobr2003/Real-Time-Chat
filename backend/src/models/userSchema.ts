@@ -13,6 +13,14 @@ export const USER_BACKGROUND_COLOR = [
 
 export type Status = (typeof USER_STATUS)[number];
 
+export const USER_PHOTO_ACCEPTED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+];
+export const USER_PHOTO_MAX_SIZE = 5 * 1024 * 1024;
+export const USER_PHOTO_MIME_TYPE = "image/webp";
+
 const HEX_COLOR_REGEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 const USERNAME_REGEX = /^[a-z0-9._]+$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -65,9 +73,8 @@ const UserSchema = new Schema(
       maxLength: [280, "A descrição deve ter no máximo 280 caracteres"],
       default: "",
     },
-    userPhotoURL: {
-      type: String,
-      trim: true,
+    userPhoto: {
+      type: Buffer,
       default: null,
     },
     status: {

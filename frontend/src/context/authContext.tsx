@@ -2,13 +2,15 @@ import { useEffect, useMemo, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMe, logout, manualLogin } from "../api/auth";
 import type { IPublicUser } from "../model/userModel";
-import { AuthContext, type IAuthContext } from "./authContextInstance";
+import {
+  AuthContext,
+  ME_QUERY_KEY,
+  type IAuthContext,
+} from "./authContextInstance";
 
 interface IAuthProvider {
   children: ReactNode;
 }
-
-const ME_QUERY_KEY = ["me"] as const;
 
 export const AuthProvider = ({ children }: IAuthProvider) => {
   const queryClient = useQueryClient();

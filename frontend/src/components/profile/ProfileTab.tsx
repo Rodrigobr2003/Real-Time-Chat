@@ -1,7 +1,11 @@
 import { CalendarDays, LogOut, Mail, Monitor, Pencil } from "lucide-react";
 import { useState } from "react";
 import styled from "styled-components";
-import { STATUS_OPTIONS, type Profile, type UserStatus } from "../../mocks/profile";
+import {
+  STATUS_OPTIONS,
+  type Profile,
+  type UserStatus,
+} from "../../mocks/profile";
 import { getStatusColor } from "../../styles/status";
 import { Avatar } from "../ui/Avatar";
 import { Button, IconButton } from "../ui/Button";
@@ -9,7 +13,6 @@ import { EditProfileModal } from "./EditProfileModal";
 
 type ProfileTabProps = {
   profile: Profile;
-  onSave: (profile: Profile) => void;
   onLogout: () => void;
   isLoggingOut?: boolean;
 };
@@ -28,7 +31,11 @@ const Cover = styled.div<{ $color: string }>`
   height: 96px;
   border-radius: ${({ theme }) => theme.radius.md};
   background:
-    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.18), transparent 50%),
+    radial-gradient(
+      circle at 20% 20%,
+      rgba(255, 255, 255, 0.18),
+      transparent 50%
+    ),
     linear-gradient(135deg, ${({ $color }) => $color}, #00b894);
 `;
 
@@ -174,12 +181,13 @@ const LogoutButton = styled(Button)`
 
 export function ProfileTab({
   profile,
-  onSave,
   onLogout,
   isLoggingOut = false,
 }: ProfileTabProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const statusLabel = STATUS_OPTIONS.find((option) => option.value === profile.status)?.label;
+  const statusLabel = STATUS_OPTIONS.find(
+    (option) => option.value === profile.status,
+  )?.label;
 
   return (
     <Wrapper>
@@ -187,7 +195,12 @@ export function ProfileTab({
 
       <Identity>
         <AvatarRing>
-          <Avatar size={88} status={profile.status} color={profile.accentColor} />
+          <Avatar
+            size={88}
+            src={profile.photoURL ?? undefined}
+            status={profile.status}
+            color={profile.accentColor}
+          />
         </AvatarRing>
 
         <NameRow>
@@ -195,7 +208,11 @@ export function ProfileTab({
             <h2>{profile.name}</h2>
             <span>@{profile.username}</span>
           </div>
-          <EditButton onClick={() => setIsEditing(true)} aria-label="Editar perfil" title="Editar perfil">
+          <EditButton
+            onClick={() => setIsEditing(true)}
+            aria-label="Editar perfil"
+            title="Editar perfil"
+          >
             <Pencil size={16} />
           </EditButton>
         </NameRow>
@@ -254,16 +271,7 @@ export function ProfileTab({
         {isLoggingOut ? "Saindo..." : "Sair da conta"}
       </LogoutButton>
 
-      {isEditing && (
-        <EditProfileModal
-          profile={profile}
-          onClose={() => setIsEditing(false)}
-          onSave={(updated) => {
-            onSave(updated);
-            setIsEditing(false);
-          }}
-        />
-      )}
+      {isEditing && <EditProfileModal onClose={() => setIsEditing(false)} />}
     </Wrapper>
   );
 }

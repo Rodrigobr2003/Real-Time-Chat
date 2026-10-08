@@ -1,11 +1,11 @@
 import type { DefaultTheme } from "styled-components";
-import type { UserStatus } from "../mocks/profile";
+import type { UserStatus } from "../model/userModel";
 
 export function getStatusColor(theme: DefaultTheme, status: UserStatus) {
   switch (status) {
     case "online":
       return theme.colors.success;
-    case "away":
+    case "absent":
       return theme.colors.warning;
     case "busy":
       return theme.colors.danger;
