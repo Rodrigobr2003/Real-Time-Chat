@@ -24,7 +24,8 @@
       "@middlewares/*": ["./src/middlewares/*"],
       "@sockets/*": ["./src/sockets/*"],
       "@utils/*": ["./src/utils/*"],
-      "@typings/*": ["./src/types/*"]
+      "@typings/*": ["./src/types/*"],
+      "@validations/*": ["./src/validations/*"]
     },
 
     /* Linting */

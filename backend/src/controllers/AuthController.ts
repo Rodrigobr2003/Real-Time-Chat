@@ -9,11 +9,7 @@ import {
   REFRESH_TOKEN_MAX_AGE_MS,
   refreshCookieOptions,
 } from "@utils/refreshToken";
-
-const loginSchema = z.object({
-  userOrEmail: z.string().trim().min(1, "Informe o usuário ou e-mail"),
-  password: z.string().min(1, "Informe a senha"),
-});
+import { loginSchema } from "@validations/auth";
 
 export class AuthController {
   constructor(private readonly authService: AuthService) {}

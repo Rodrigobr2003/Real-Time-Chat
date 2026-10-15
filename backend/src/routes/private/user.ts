@@ -1,7 +1,7 @@
 import { Router, type Application } from "express";
 import { UserController } from "@controllers/UserController";
 import { requireAuth } from "@middlewares/requireAuth";
-import { uploadUserPhoto } from "@middlewares/uploadUserPhoto";
+import { uploadUserPhoto } from "@middlewares/uploadPhoto";
 import { MongoUserRepository } from "@repositories/UserRepository";
 import { UserService } from "@services/UserService";
 

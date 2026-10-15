@@ -7,7 +7,7 @@ import type {
   PublicUser,
   UpdateUserInput,
 } from "@typings/user";
-import { compressUserPhoto } from "@utils/image";
+import { compressPhoto } from "@utils/image";
 
 export class UserService {
   constructor(private readonly userRepository: IUserRepository) {}
@@ -54,7 +54,7 @@ export class UserService {
     const updated = await this.userRepository.update(userId, {
       ...input,
       ...(input.userPhoto && {
-        userPhoto: await compressUserPhoto(input.userPhoto),
+        userPhoto: await compressPhoto(input.userPhoto),
       }),
     });
 
