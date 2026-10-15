@@ -1,11 +1,14 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import styled from "styled-components";
 import { ChatHeader } from "../components/chat/ChatHeader";
 import { MessageBubble } from "../components/chat/MessageBubble";
 import { MessageInput } from "../components/chat/MessageInput";
+import { useConnectedUsers } from "../hooks/useConnectedUsers";
 import { mockMessages } from "../mocks/messages";
-import { mockRooms } from "../mocks/rooms";
+import type { IPublicChat } from "../model/chatModel";
+
+type ChatLocationState = { room?: IPublicChat } | null;
 
 const Page = styled.main`
   height: 100%;
@@ -46,7 +49,9 @@ export default function Chat() {
   const navigate = useNavigate();
   const { roomId = "" } = useParams();
   const [text, setText] = useState("");
-  const room = mockRooms.find((item) => item.id === roomId);
+  const room = (useLocation().state as ChatLocationState)?.room;
+  const { data: connectedUsers = [], isPending: isLoadingUsers } =
+    useConnectedUsers(roomId);
 
   return (
     <Page>
@@ -54,9 +59,13 @@ export default function Chat() {
         <ChatHeader
           roomName={room?.name ?? "Sala"}
           roomId={roomId}
-          isPrivate={room?.isPrivate ?? false}
-          members={room?.members ?? 1}
-          maxMembers={room?.maxMembers ?? 2}
+          isPrivate={room?.privacy === "private"}
+          members={isLoadingUsers ? (room?.usersCount ?? 0) : connectedUsers.length}
+          maxMembers={room?.userLimit ?? 0}
+          photoURL={room?.chatPhotoURL}
+          color={room?.chatBgColor}
+          connectedUsers={connectedUsers}
+          isLoadingUsers={isLoadingUsers}
           onBack={() => navigate("/home")}
         />
 

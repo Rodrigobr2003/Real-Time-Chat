@@ -1,9 +1,12 @@
+import { formatDistanceToNowStrict } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Lock, LockOpen, Users } from "lucide-react";
 import styled from "styled-components";
-import type { Room } from "../../mocks/rooms";
+import type { IPublicChat } from "../../model/chatModel";
+import { Avatar } from "../ui/Avatar";
 
 type RoomItemProps = {
-  room: Room;
+  room: IPublicChat;
   onClick: () => void;
 };
 
@@ -27,20 +30,6 @@ const Item = styled.button`
   }
 `;
 
-const LockBadge = styled.span<{ $private: boolean }>`
-  flex-shrink: 0;
-  width: 42px;
-  height: 42px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: ${({ theme }) => theme.radius.md};
-  background: ${({ $private }) =>
-    $private ? "rgba(231, 76, 60, 0.12)" : "rgba(46, 204, 113, 0.12)"};
-  color: ${({ $private, theme }) =>
-    $private ? theme.colors.danger : theme.colors.success};
-`;
-
 const Info = styled.div`
   flex: 1;
   min-width: 0;
@@ -52,14 +41,15 @@ const Info = styled.div`
     overflow: hidden;
     text-overflow: ellipsis;
   }
+`;
 
-  p {
-    font-size: 13px;
-    color: ${({ theme }) => theme.colors.textMuted};
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+const Privacy = styled.p<{ $private: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: ${({ $private, theme }) =>
+    $private ? theme.colors.danger : theme.colors.success};
 `;
 
 const Meta = styled.div`
@@ -70,7 +60,6 @@ const Meta = styled.div`
   gap: 4px;
   font-size: 12px;
   color: ${({ theme }) => theme.colors.textMuted};
-
 `;
 
 const Capacity = styled.span<{ $full: boolean }>`
@@ -84,26 +73,38 @@ const Capacity = styled.span<{ $full: boolean }>`
   color: ${({ $full, theme }) => ($full ? theme.colors.danger : theme.colors.textMuted)};
 `;
 
+const formatCreatedAt = (createdAt: string) =>
+  formatDistanceToNowStrict(new Date(createdAt), {
+    locale: ptBR,
+    addSuffix: true,
+  });
+
 export function RoomItem({ room, onClick }: RoomItemProps) {
-  const isFull = room.members >= room.maxMembers;
+  const isFull = room.usersCount >= room.userLimit;
+  const isPrivate = room.privacy === "private";
 
   return (
     <Item onClick={onClick} disabled={isFull}>
-      <LockBadge
-        $private={room.isPrivate}
-        title={room.isPrivate ? "Sala privada" : "Sala pública"}
-      >
-        {room.isPrivate ? <Lock size={18} /> : <LockOpen size={18} />}
-      </LockBadge>
+      <Avatar
+        name={room.name}
+        src={room.chatPhotoURL ?? undefined}
+        color={room.chatBgColor}
+        size={42}
+      />
       <Info>
         <strong>{room.name}</strong>
-        <p>{room.lastMessage}</p>
+        <Privacy $private={isPrivate}>
+          {isPrivate ? <Lock size={12} /> : <LockOpen size={12} />}
+          {isPrivate ? "Sala privada" : "Sala pública"}
+        </Privacy>
       </Info>
       <Meta>
-        <time>{room.lastActivity}</time>
+        <time dateTime={room.createdAt} title="Criada">
+          {formatCreatedAt(room.createdAt)}
+        </time>
         <Capacity $full={isFull} title={isFull ? "Sala cheia" : "Pessoas na sala"}>
           <Users size={12} />
-          {isFull ? "Cheia" : `${room.members}/${room.maxMembers}`}
+          {isFull ? "Cheia" : `${room.usersCount}/${room.userLimit}`}
         </Capacity>
       </Meta>
     </Item>
