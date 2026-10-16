@@ -12,6 +12,8 @@ const controller = new ChatController(service);
 const router = Router();
 
 router.post("/create", requireAuth, uploadChatPhoto, controller.create);
+router.patch("/:chatId", requireAuth, uploadChatPhoto, controller.update);
+router.delete("/:chatId", requireAuth, controller.delete);
 router.get("/list", requireAuth, controller.list);
 router.get(
   "/:chatId/connected-users",
@@ -19,6 +21,7 @@ router.get(
   controller.listConnectedUsers,
 );
 router.patch("/:chatId/connect", requireAuth, controller.connect);
+router.patch("/:chatId/disconnect", requireAuth, controller.disconnect);
 
 export default (app: Application, versionPrefix: string) =>
   app.use(`${versionPrefix}chats/private`, router);

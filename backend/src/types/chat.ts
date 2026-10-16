@@ -22,6 +22,10 @@ export interface CreateChatInput {
   password?: string | null;
 }
 
+export interface UpdateChatInput extends Partial<CreateChatInput> {
+  chatId: string;
+}
+
 export interface ChatListFilters {
   privacy?: ChatPrivacy;
   minUsers?: number;
@@ -35,7 +39,7 @@ export interface ListChatsInput extends ChatListFilters {
   limit: number;
 }
 
-export interface ChatConnectInput {
+export interface ChatConnectionInput {
   accountId: string;
   chatId: string;
   password?: string;

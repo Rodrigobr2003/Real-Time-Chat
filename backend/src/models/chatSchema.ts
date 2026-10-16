@@ -55,8 +55,14 @@ const ChatSchema = new Schema(
     userLimit: {
       type: Number,
       required: [true, "O limite de pessoas é obrigatório"],
-      min: [CHAT_MIN_USERS, `A sala deve permitir no mínimo ${CHAT_MIN_USERS} pessoas`],
-      max: [CHAT_MAX_USERS, `A sala deve permitir no máximo ${CHAT_MAX_USERS} pessoas`],
+      min: [
+        CHAT_MIN_USERS,
+        `A sala deve permitir no mínimo ${CHAT_MIN_USERS} pessoas`,
+      ],
+      max: [
+        CHAT_MAX_USERS,
+        `A sala deve permitir no máximo ${CHAT_MAX_USERS} pessoas`,
+      ],
     },
     privacy: {
       type: String,
@@ -97,6 +103,10 @@ const ChatSchema = new Schema(
         },
         message: "A sala atingiu o limite de usuários",
       },
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
     },
   },
   { timestamps: true },

@@ -2,11 +2,12 @@ import { hash, Algorithm } from "@node-rs/argon2";
 import type { IChatRepository } from "@repositories/ChatRepository";
 import type {
   ChatList,
-  ChatConnectInput,
+  ChatConnectionInput,
   ConnectedUser,
   CreateChatInput,
   ListChatsInput,
   PublicChat,
+  UpdateChatInput,
 } from "@typings/chat";
 import { compressPhoto } from "@utils/image";
 
@@ -28,6 +29,27 @@ export class ChatService {
     });
   }
 
+  async updateChat(input: UpdateChatInput): Promise<PublicChat | null> {
+    if (input.privacy === "public") {
+      input.password = null;
+    } else if (input.password) {
+      input.password = await hash(input.password, {
+        algorithm: Algorithm.Argon2id,
+      });
+    }
+
+    return this.chatRepository.update({
+      ...input,
+      ...(input.chatPhoto && {
+        chatPhoto: await compressPhoto(input.chatPhoto),
+      }),
+    });
+  }
+
+  async delete(chatId: string): Promise<boolean> {
+    return this.chatRepository.delete(chatId);
+  }
+
   async listChats(input: ListChatsInput): Promise<ChatList> {
     return this.chatRepository.list(input);
   }
@@ -36,7 +58,11 @@ export class ChatService {
     return this.chatRepository.listConnectedUsers(chatId);
   }
 
-  async connectUser(input: ChatConnectInput): Promise<boolean> {
+  async connectUser(input: ChatConnectionInput): Promise<boolean> {
     return this.chatRepository.connect(input);
+  }
+
+  async disconnectUser(input: ChatConnectionInput): Promise<boolean> {
+    return this.chatRepository.disconnect(input);
   }
 }

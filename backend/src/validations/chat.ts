@@ -58,7 +58,7 @@ const usersCountSchema = z.coerce
   .int()
   .min(1, "Quantidade de usuários deve ser maior que zero");
 
-export const createChatSchema = z
+export const chatSchema = z
   .object({
     name: nameSchema,
     userLimit: userLimitSchema,
@@ -82,6 +82,7 @@ export const updateChatSchema = z
     privacy: privacySchema,
     chatBgColor: chatBgColorSchema,
     chatPhoto: chatPhotoSchema,
+    password: passwordSchema,
   })
   .partial()
   .refine((data) => Object.keys(data).length > 0, {
