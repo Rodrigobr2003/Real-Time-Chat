@@ -23,6 +23,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+to-do-list.txt
 
 # Env files
 .env

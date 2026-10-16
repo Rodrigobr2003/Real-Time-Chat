@@ -35,6 +35,15 @@ export interface ICreateChatDTO {
   password: string;
 }
 
+export interface IUpdateChatDTO {
+  name?: string;
+  userLimit?: number;
+  privacy?: ChatPrivacy;
+  chatBgColor?: string;
+  chatPhoto?: File;
+  password?: string;
+}
+
 export interface IConnectChatDTO {
   chatId: string;
   password?: string;

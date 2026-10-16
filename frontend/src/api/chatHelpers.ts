@@ -6,6 +6,7 @@ import type {
   ICreateChatDTO,
   IListChatsParams,
   IPublicChat,
+  IUpdateChatDTO,
 } from "../model/chatModel";
 
 const PRIVATE_CHAT_DEFAULT_PATH = "/chats/private";
@@ -39,6 +40,38 @@ export const connectChat = async ({ chatId, password }: IConnectChatDTO) => {
   await api.patch(`${PRIVATE_CHAT_DEFAULT_PATH}/${chatId}/connect`, {
     password,
   });
+};
+
+export const updateChat = async (
+  chatId: string,
+  { chatPhoto, ...fields }: IUpdateChatDTO,
+) => {
+  let payload: IUpdateChatDTO | FormData = fields;
+
+  if (chatPhoto) {
+    payload = new FormData();
+
+    for (const [key, value] of Object.entries(fields)) {
+      payload.append(key, String(value));
+    }
+
+    payload.append("chatPhoto", chatPhoto);
+  }
+
+  const { data } = await api.patch<IPublicChat>(
+    `${PRIVATE_CHAT_DEFAULT_PATH}/${chatId}`,
+    payload,
+  );
+
+  return data;
+};
+
+export const deleteChat = async (chatId: string) => {
+  await api.delete(`${PRIVATE_CHAT_DEFAULT_PATH}/${chatId}`);
+};
+
+export const disconnectChat = async (chatId: string) => {
+  await api.patch(`${PRIVATE_CHAT_DEFAULT_PATH}/${chatId}/disconnect`);
 };
 
 export const listConnectedUsers = async (chatId: string) => {
