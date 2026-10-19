@@ -71,12 +71,8 @@ export default function Chat() {
     chatBgColor: room?.chatBgColor ?? CHAT_BG_COLORS[0],
     chatPhotoURL: room?.chatPhotoURL ?? null,
   }));
-  const [hiddenUserIds, setHiddenUserIds] = useState<string[]>([]);
-  const { data: fetchedUsers = [], isPending: isLoadingUsers } =
+  const { data: connectedUsers = [], isPending: isLoadingUsers } =
     useConnectedUsers(roomId);
-  const connectedUsers = fetchedUsers.filter(
-    (user) => !hiddenUserIds.includes(user.id),
-  );
   const queryClient = useQueryClient();
   const { mutate: disconnect, isPending: isDisconnecting } = useMutation({
     mutationFn: disconnectChat,
@@ -124,9 +120,7 @@ export default function Chat() {
     setIsSettingsOpen(true);
   }
 
-  // Remover/bloquear usuários ainda é só local (sem endpoint).
   function handleSaveSettings(changes: RoomSettingsChanges) {
-    const { removedUserIds, blockedUserIds } = changes;
     const dto: IUpdateChatDTO = {
       ...(changes.name !== settings.name && { name: changes.name }),
       ...(changes.userLimit !== settings.userLimit && {
@@ -140,14 +134,7 @@ export default function Chat() {
       ...(changes.password && { password: changes.password }),
     };
 
-    const finish = () => {
-      setHiddenUserIds((current) => [
-        ...current,
-        ...removedUserIds,
-        ...blockedUserIds,
-      ]);
-      setIsSettingsOpen(false);
-    };
+    const finish = () => setIsSettingsOpen(false);
 
     if (Object.keys(dto).length === 0) return finish();
 
@@ -189,6 +176,7 @@ export default function Chat() {
 
       {isSettingsOpen && (
         <RoomSettingsModal
+          chatId={roomId}
           settings={settings}
           connectedUsers={connectedUsers}
           onClose={() => setIsSettingsOpen(false)}

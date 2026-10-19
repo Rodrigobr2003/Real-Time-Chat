@@ -56,6 +56,15 @@ export interface IConnectedUser {
   userPhotoURL: string | null;
   status: UserStatus;
   profileBgColor: string;
+  punishedCount?: number;
+}
+
+export type PunishmentType = "temporary" | "blocked";
+
+export interface IPunishmentResult {
+  type: PunishmentType;
+  expiresAt: string | null;
+  punishedCount: number;
 }
 
 export interface IPublicChat {

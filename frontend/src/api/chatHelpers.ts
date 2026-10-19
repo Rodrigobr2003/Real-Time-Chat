@@ -6,7 +6,9 @@ import type {
   ICreateChatDTO,
   IListChatsParams,
   IPublicChat,
+  IPunishmentResult,
   IUpdateChatDTO,
+  PunishmentType,
 } from "../model/chatModel";
 
 const PRIVATE_CHAT_DEFAULT_PATH = "/chats/private";
@@ -72,6 +74,38 @@ export const deleteChat = async (chatId: string) => {
 
 export const disconnectChat = async (chatId: string) => {
   await api.patch(`${PRIVATE_CHAT_DEFAULT_PATH}/${chatId}/disconnect`);
+};
+
+export const listBlockedUsers = async (chatId: string) => {
+  const { data } = await api.get<IConnectedUser[]>(
+    `${PRIVATE_CHAT_DEFAULT_PATH}/${chatId}/blocked-users`,
+  );
+
+  return data;
+};
+
+const chatUserPath = (chatId: string, userId: string) =>
+  `${PRIVATE_CHAT_DEFAULT_PATH}/${chatId}/users/${userId}`;
+
+export const kickUser = async (chatId: string, userId: string) => {
+  await api.patch(`${chatUserPath(chatId, userId)}/kick`);
+};
+
+export const punishUser = async (
+  chatId: string,
+  userId: string,
+  type: PunishmentType,
+) => {
+  const { data } = await api.patch<IPunishmentResult>(
+    `${chatUserPath(chatId, userId)}/punish`,
+    { type },
+  );
+
+  return data;
+};
+
+export const unblockUser = async (chatId: string, userId: string) => {
+  await api.patch(`${chatUserPath(chatId, userId)}/unblock`);
 };
 
 export const listConnectedUsers = async (chatId: string) => {

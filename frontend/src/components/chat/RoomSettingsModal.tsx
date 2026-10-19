@@ -1,18 +1,26 @@
 import {
+  Ban,
   Camera,
   Check,
+  ChevronDown,
+  Hourglass,
   Lock,
   LockOpen,
+  LogOut,
   Minus,
   Pencil,
   Plus,
+  ShieldCheck,
+  ShieldPlus,
   Trash2,
   UserCheck,
-  UserX,
   Users,
 } from "lucide-react";
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import styled from "styled-components";
+import { useAuth } from "../../hooks/useAuth";
+import { useRoomModeration } from "../../hooks/useRoomModeration";
+import { getApiErrors } from "../../utils/apiErrors";
 import {
   CHAT_BG_COLORS,
   CHAT_MAX_USERS,
@@ -32,6 +40,13 @@ import { Form } from "../ui/Card";
 import { FieldError, FieldHint, Input, Label } from "../ui/Input";
 import { Modal } from "../ui/Modal";
 
+const PUNISHMENT_STEPS = ["5 minutos", "15 minutos", "1 hora"] as const;
+
+const getNextPunishment = (kickCount: number) =>
+  kickCount < PUNISHMENT_STEPS.length
+    ? `Expulsão por ${PUNISHMENT_STEPS[kickCount]}`
+    : "Bloqueio permanente da sala";
+
 export type RoomSettings = {
   name: string;
   privacy: ChatPrivacy;
@@ -43,11 +58,11 @@ export type RoomSettings = {
 export type RoomSettingsChanges = RoomSettings & {
   chatPhoto: File | null;
   password: string;
-  removedUserIds: string[];
-  blockedUserIds: string[];
+  adminUserIds: string[];
 };
 
 type RoomSettingsModalProps = {
+  chatId: string;
   settings: RoomSettings;
   connectedUsers: IConnectedUser[];
   onClose: () => void;
@@ -192,8 +207,54 @@ const RowAction = styled.button<{ $danger?: boolean }>`
   color: ${({ theme }) => theme.colors.textMuted};
 
   &:hover {
-    color: ${({ $danger, theme }) => ($danger ? theme.colors.danger : theme.colors.text)};
+    color: ${({ $danger, theme }) =>
+      $danger ? theme.colors.danger : theme.colors.text};
   }
+`;
+
+const MenuBackdrop = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+`;
+
+const ActionsMenu = styled.ul<{ $top: number; $right: number }>`
+  position: fixed;
+  top: ${({ $top }) => $top}px;
+  right: ${({ $right }) => $right}px;
+  z-index: 21;
+  min-width: 220px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border-radius: ${({ theme }) => theme.radius.md};
+  background: ${({ theme }) => theme.colors.surface};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  box-shadow: ${({ theme }) => theme.shadow};
+`;
+
+const MenuItem = styled.button<{ $danger?: boolean }>`
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+  text-align: left;
+  border-radius: ${({ theme }) => theme.radius.sm};
+  color: ${({ $danger, theme }) =>
+    $danger ? theme.colors.danger : theme.colors.text};
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.surfaceAlt};
+  }
+`;
+
+const AdminBadge = styled.span`
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 4px;
+  color: ${({ theme }) => theme.colors.primary};
 `;
 
 const Empty = styled.p`
@@ -292,7 +353,8 @@ const Swatch = styled.button<{ $color: string; $active: boolean }>`
   border-radius: 50%;
   background: ${({ $color }) => $color};
   color: #fff;
-  outline: 2px solid ${({ $active, theme }) => ($active ? theme.colors.text : "transparent")};
+  outline: 2px solid
+    ${({ $active, theme }) => ($active ? theme.colors.text : "transparent")};
   outline-offset: 2px;
   transition: transform 0.15s;
 
@@ -331,6 +393,43 @@ const ConfirmDeleteButton = styled(Button)`
   }
 `;
 
+const ConfirmUser = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  strong {
+    display: block;
+    font-size: 15px;
+  }
+
+  small {
+    font-size: 13px;
+    color: ${({ theme }) => theme.colors.textMuted};
+  }
+`;
+
+const PunishmentInfo = styled.dl`
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 12px;
+  font-size: 14px;
+  border-radius: ${({ theme }) => theme.radius.md};
+  background: ${({ theme }) => theme.colors.surfaceAlt};
+
+  dt {
+    color: ${({ theme }) => theme.colors.textMuted};
+  }
+
+  dd {
+    margin: 0;
+    font-weight: 600;
+    text-align: right;
+  }
+`;
+
 const Actions = styled.div`
   display: flex;
   gap: 10px;
@@ -341,6 +440,7 @@ const Actions = styled.div`
 `;
 
 export function RoomSettingsModal({
+  chatId,
   settings,
   connectedUsers,
   onClose,
@@ -362,8 +462,21 @@ export function RoomSettingsModal({
   const [password, setPassword] = useState("");
   const [chatPhoto, setChatPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [removedUserIds, setRemovedUserIds] = useState<string[]>([]);
-  const [blockedUserIds, setBlockedUserIds] = useState<string[]>([]);
+  const { blockedUsersQuery, kick, punish, unblock } =
+    useRoomModeration(chatId);
+  const [moderationError, setModerationError] = useState("");
+  const [userToPunish, setUserToPunish] = useState<IConnectedUser | null>(null);
+  const [userToBlock, setUserToBlock] = useState<IConnectedUser | null>(null);
+  const [userToUnblock, setUserToUnblock] = useState<IConnectedUser | null>(
+    null,
+  );
+  const currentUserId = useAuth().user?.id;
+  const [adminUserIds, setAdminUserIds] = useState<string[]>([]);
+  const [openMenu, setOpenMenu] = useState<{
+    user: IConnectedUser;
+    top: number;
+    right: number;
+  } | null>(null);
   const [photoError, setPhotoError] = useState("");
   const photoInputRef = useRef<HTMLInputElement>(null);
 
@@ -371,10 +484,9 @@ export function RoomSettingsModal({
   const isPrivate = privacy === "private";
   const needsPassword = isPrivate && settings.privacy !== "private";
   const photoURL = photoPreview ?? settings.chatPhotoURL;
-  const visibleUsers = connectedUsers.filter(
-    (user) => !removedUserIds.includes(user.id) && !blockedUserIds.includes(user.id),
-  );
-  const blockedUsers = connectedUsers.filter((user) => blockedUserIds.includes(user.id));
+  const visibleUsers = connectedUsers;
+  const blockedUsers = blockedUsersQuery.data ?? [];
+  const punishCount = userToPunish?.punishedCount ?? 0;
   const minLimit = Math.max(CHAT_MIN_USERS, visibleUsers.length);
   const isNameValid = name.trim().length >= CHAT_NAME_MIN_LENGTH;
   const isPasswordValid = needsPassword
@@ -401,15 +513,81 @@ export function RoomSettingsModal({
   }
 
   function changeLimit(value: number) {
-    const next = Math.min(CHAT_MAX_USERS, Math.max(minLimit, value || minLimit));
+    const next = Math.min(
+      CHAT_MAX_USERS,
+      Math.max(minLimit, value || minLimit),
+    );
     setUserLimit(next);
     setLimitText(String(next));
   }
 
-  function toggleBlocked(userId: string) {
-    setBlockedUserIds((current) =>
-      current.includes(userId) ? current.filter((id) => id !== userId) : [...current, userId],
+  const onModerationError = (error: unknown) =>
+    setModerationError(getApiErrors(error).message);
+
+  function kickFromRoom(user: IConnectedUser) {
+    setModerationError("");
+    kick.mutate(user.id, { onError: onModerationError });
+  }
+
+  function confirmPunish() {
+    if (!userToPunish) return;
+
+    setModerationError("");
+    punish.mutate(
+      { userId: userToPunish.id, type: "temporary" },
+      { onSuccess: () => setUserToPunish(null), onError: onModerationError },
     );
+  }
+
+  function confirmBlock() {
+    if (!userToBlock) return;
+
+    setModerationError("");
+    punish.mutate(
+      { userId: userToBlock.id, type: "blocked" },
+      { onSuccess: () => setUserToBlock(null), onError: onModerationError },
+    );
+  }
+
+  function closeConfirm() {
+    setUserToPunish(null);
+    setUserToBlock(null);
+    setUserToUnblock(null);
+    setModerationError("");
+  }
+
+  function openUserMenu(user: IConnectedUser, button: HTMLElement) {
+    const rect = button.getBoundingClientRect();
+    setOpenMenu({
+      user,
+      top: rect.bottom + 4,
+      right: window.innerWidth - rect.right,
+    });
+  }
+
+  function runMenuAction(action: (user: IConnectedUser) => void) {
+    if (!openMenu) return;
+
+    action(openMenu.user);
+    setOpenMenu(null);
+  }
+
+  function toggleAdmin(user: IConnectedUser) {
+    setAdminUserIds((current) =>
+      current.includes(user.id)
+        ? current.filter((id) => id !== user.id)
+        : [...current, user.id],
+    );
+  }
+
+  function confirmUnblock() {
+    if (!userToUnblock) return;
+
+    setModerationError("");
+    unblock.mutate(userToUnblock.id, {
+      onSuccess: () => setUserToUnblock(null),
+      onError: onModerationError,
+    });
   }
 
   function handleSubmit(event: FormEvent) {
@@ -425,8 +603,7 @@ export function RoomSettingsModal({
       chatPhotoURL: photoURL,
       chatPhoto,
       password: isPrivate ? password : "",
-      removedUserIds,
-      blockedUserIds,
+      adminUserIds,
     });
   }
 
@@ -445,7 +622,12 @@ export function RoomSettingsModal({
           onClick={() => photoInputRef.current?.click()}
           aria-label="Alterar foto da sala"
         >
-          <Avatar size={96} name={name || settings.name} src={photoURL ?? undefined} color={chatBgColor} />
+          <Avatar
+            size={96}
+            name={name || settings.name}
+            src={photoURL ?? undefined}
+            color={chatBgColor}
+          />
           <span>
             <Camera size={28} />
           </span>
@@ -475,7 +657,9 @@ export function RoomSettingsModal({
               </PencilButton>
             </NameEditor>
             {!isNameValid && (
-              <FieldError>Mínimo de {CHAT_NAME_MIN_LENGTH} caracteres</FieldError>
+              <FieldError>
+                Mínimo de {CHAT_NAME_MIN_LENGTH} caracteres
+              </FieldError>
             )}
             {fieldErrors.name && <FieldError>{fieldErrors.name}</FieldError>}
           </Label>
@@ -497,7 +681,9 @@ export function RoomSettingsModal({
             {isPrivate ? <Lock size={18} /> : <LockOpen size={18} />}
             <span>
               Sala {isPrivate ? "privada" : "pública"}
-              <small>{isPrivate ? "Acesso com senha" : "Qualquer um entra"}</small>
+              <small>
+                {isPrivate ? "Acesso com senha" : "Qualquer um entra"}
+              </small>
             </span>
           </div>
           <Switch
@@ -529,33 +715,41 @@ export function RoomSettingsModal({
                     status={user.status}
                   />
                   <UserInfo>
-                    <strong>{user.name}</strong>
+                    <strong>
+                      {user.name}
+                      {user.id === currentUserId && " (você)"}
+                      {adminUserIds.includes(user.id) && (
+                        <AdminBadge title="Administrador">
+                          <ShieldCheck size={14} />
+                        </AdminBadge>
+                      )}
+                    </strong>
                     <small>@{user.user}</small>
                   </UserInfo>
-                  <RowAction
-                    type="button"
-                    $danger
-                    title="Remover da sala"
-                    aria-label={`Remover ${user.name} da sala`}
-                    onClick={() => setRemovedUserIds((current) => [...current, user.id])}
-                  >
-                    <Trash2 size={16} />
-                  </RowAction>
-                  <RowAction
-                    type="button"
-                    $danger
-                    title="Bloquear acesso"
-                    aria-label={`Bloquear ${user.name}`}
-                    onClick={() => toggleBlocked(user.id)}
-                  >
-                    <UserX size={16} />
-                  </RowAction>
+                  {user.id !== currentUserId && (
+                    <RowAction
+                      type="button"
+                      title="Opções"
+                      aria-label={`Opções para ${user.name}`}
+                      aria-haspopup="menu"
+                      aria-expanded={openMenu?.user.id === user.id}
+                      onClick={(event) =>
+                        openUserMenu(user, event.currentTarget)
+                      }
+                    >
+                      <ChevronDown size={16} />
+                    </RowAction>
+                  )}
                 </UserRow>
               ))}
             </UserList>
           ) : (
             <Empty>Nenhum usuário conectado</Empty>
           )}
+          {moderationError &&
+            !userToPunish &&
+            !userToBlock &&
+            !userToUnblock && <FieldError>{moderationError}</FieldError>}
         </Group>
 
         {blockedUsers.length > 0 && (
@@ -578,7 +772,7 @@ export function RoomSettingsModal({
                     type="button"
                     title="Desbloquear"
                     aria-label={`Desbloquear ${user.name}`}
-                    onClick={() => toggleBlocked(user.id)}
+                    onClick={() => setUserToUnblock(user)}
                   >
                     <UserCheck size={16} />
                   </RowAction>
@@ -618,7 +812,8 @@ export function RoomSettingsModal({
                 const text = event.target.value.replace(/D/g, "").slice(0, 2);
                 setLimitText(text);
                 const value = Number(text);
-                if (value >= minLimit && value <= CHAT_MAX_USERS) setUserLimit(value);
+                if (value >= minLimit && value <= CHAT_MAX_USERS)
+                  setUserLimit(value);
               }}
               onBlur={() => changeLimit(Number(limitText))}
               onKeyDown={(event) => {
@@ -638,7 +833,9 @@ export function RoomSettingsModal({
             </StepButton>
           </Stepper>
         </LimitRow>
-        {fieldErrors.userLimit && <FieldError>{fieldErrors.userLimit}</FieldError>}
+        {fieldErrors.userLimit && (
+          <FieldError>{fieldErrors.userLimit}</FieldError>
+        )}
 
         {isPrivate && (
           <Label>
@@ -656,8 +853,12 @@ export function RoomSettingsModal({
               onChange={(event) => setPassword(event.target.value)}
               aria-invalid={!isPasswordValid}
             />
-            <FieldHint>Mínimo de {CHAT_PASSWORD_MIN_LENGTH} caracteres</FieldHint>
-            {fieldErrors.password && <FieldError>{fieldErrors.password}</FieldError>}
+            <FieldHint>
+              Mínimo de {CHAT_PASSWORD_MIN_LENGTH} caracteres
+            </FieldHint>
+            {fieldErrors.password && (
+              <FieldError>{fieldErrors.password}</FieldError>
+            )}
           </Label>
         )}
 
@@ -690,7 +891,9 @@ export function RoomSettingsModal({
           Excluir sala
         </DeleteButton>
 
-        {saveError && !hasFieldErrors && <FieldError>{saveError.message}</FieldError>}
+        {saveError && !hasFieldErrors && (
+          <FieldError>{saveError.message}</FieldError>
+        )}
 
         <Actions>
           <Button type="button" $variant="ghost" onClick={onClose}>
@@ -723,11 +926,194 @@ export function RoomSettingsModal({
           >
             Cancelar
           </Button>
-          <ConfirmDeleteButton type="button" onClick={onDelete} disabled={isDeleting}>
+          <ConfirmDeleteButton
+            type="button"
+            onClick={onDelete}
+            disabled={isDeleting}
+          >
             <Trash2 size={16} />
             {isDeleting ? "Excluindo..." : "Excluir"}
           </ConfirmDeleteButton>
         </Actions>
+      </Modal>
+
+      {openMenu && (
+        <>
+          <MenuBackdrop onClick={() => setOpenMenu(null)} />
+          <ActionsMenu role="menu" $top={openMenu.top} $right={openMenu.right}>
+            <li>
+              <MenuItem
+                type="button"
+                role="menuitem"
+                onClick={() => runMenuAction(toggleAdmin)}
+              >
+                <ShieldPlus size={16} />
+                {adminUserIds.includes(openMenu.user.id)
+                  ? "Remover administrador"
+                  : "Adicionar como administrador"}
+              </MenuItem>
+            </li>
+            <li>
+              <MenuItem
+                type="button"
+                role="menuitem"
+                onClick={() => runMenuAction(kickFromRoom)}
+              >
+                <LogOut size={16} />
+                Retirar da sala
+              </MenuItem>
+            </li>
+            <li>
+              <MenuItem
+                type="button"
+                role="menuitem"
+                $danger
+                onClick={() => runMenuAction(setUserToPunish)}
+              >
+                <Hourglass size={16} />
+                Punir
+              </MenuItem>
+            </li>
+            <li>
+              <MenuItem
+                type="button"
+                role="menuitem"
+                $danger
+                onClick={() => runMenuAction(setUserToBlock)}
+              >
+                <Ban size={16} />
+                Bloquear
+              </MenuItem>
+            </li>
+          </ActionsMenu>
+        </>
+      )}
+
+      <Modal title="Punir usuário" open={!!userToPunish} onClose={closeConfirm}>
+        {userToPunish && (
+          <>
+            <ConfirmUser>
+              <Avatar
+                size={42}
+                name={userToPunish.name}
+                src={userToPunish.userPhotoURL ?? undefined}
+                color={userToPunish.profileBgColor}
+              />
+              <div>
+                <strong>{userToPunish.name}</strong>
+                <small>@{userToPunish.user}</small>
+              </div>
+            </ConfirmUser>
+            <PunishmentInfo>
+              <dt>Vezes já expulso</dt>
+              <dd>{punishCount}</dd>
+              <dt>Próxima punição</dt>
+              <dd>{getNextPunishment(punishCount)}</dd>
+            </PunishmentInfo>
+            <ConfirmText>
+              O usuário será retirado da sala e só poderá voltar quando o tempo
+              da punição acabar. A cada nova punição o tempo aumenta: 5 minutos,
+              15 minutos, 1 hora e, por fim, bloqueio.
+            </ConfirmText>
+            {moderationError && <FieldError>{moderationError}</FieldError>}
+            <Actions>
+              <Button type="button" $variant="ghost" onClick={closeConfirm}>
+                Cancelar
+              </Button>
+              <ConfirmDeleteButton
+                type="button"
+                onClick={confirmPunish}
+                disabled={punish.isPending}
+              >
+                <Hourglass size={16} />
+                {punish.isPending ? "Punindo..." : "Punir"}
+              </ConfirmDeleteButton>
+            </Actions>
+          </>
+        )}
+      </Modal>
+
+      <Modal
+        title="Bloquear usuário"
+        open={!!userToBlock}
+        onClose={closeConfirm}
+      >
+        {userToBlock && (
+          <>
+            <ConfirmUser>
+              <Avatar
+                size={42}
+                name={userToBlock.name}
+                src={userToBlock.userPhotoURL ?? undefined}
+                color={userToBlock.profileBgColor}
+              />
+              <div>
+                <strong>{userToBlock.name}</strong>
+                <small>@{userToBlock.user}</small>
+              </div>
+            </ConfirmUser>
+            <ConfirmText>
+              <strong>{userToBlock.name}</strong> não poderá mais entrar nesta
+              sala enquanto não for desbloqueado.
+            </ConfirmText>
+            {moderationError && <FieldError>{moderationError}</FieldError>}
+            <Actions>
+              <Button type="button" $variant="ghost" onClick={closeConfirm}>
+                Cancelar
+              </Button>
+              <ConfirmDeleteButton
+                type="button"
+                onClick={confirmBlock}
+                disabled={punish.isPending}
+              >
+                <Ban size={16} />
+                {punish.isPending ? "Bloqueando..." : "Bloquear"}
+              </ConfirmDeleteButton>
+            </Actions>
+          </>
+        )}
+      </Modal>
+
+      <Modal
+        title="Desbloquear usuário"
+        open={!!userToUnblock}
+        onClose={closeConfirm}
+      >
+        {userToUnblock && (
+          <>
+            <ConfirmUser>
+              <Avatar
+                size={42}
+                name={userToUnblock.name}
+                src={userToUnblock.userPhotoURL ?? undefined}
+                color={userToUnblock.profileBgColor}
+              />
+              <div>
+                <strong>{userToUnblock.name}</strong>
+                <small>@{userToUnblock.user}</small>
+              </div>
+            </ConfirmUser>
+            <ConfirmText>
+              <strong>{userToUnblock.name}</strong> poderá entrar nesta sala
+              novamente e o histórico de punições será zerado: a próxima punição
+              volta a ser de 5 minutos.
+            </ConfirmText>
+            {moderationError && <FieldError>{moderationError}</FieldError>}
+            <Actions>
+              <Button type="button" $variant="ghost" onClick={closeConfirm}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={confirmUnblock}
+                disabled={unblock.isPending}
+              >
+                <UserCheck size={16} />
+                {unblock.isPending ? "Desbloqueando..." : "Desbloquear"}
+              </Button>
+            </Actions>
+          </>
+        )}
       </Modal>
     </Modal>
   );
