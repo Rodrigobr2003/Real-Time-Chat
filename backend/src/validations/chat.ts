@@ -9,6 +9,7 @@ import {
   CHAT_PRIVACY,
   HEX_COLOR_REGEX,
 } from "@models/chatSchema";
+import { PUNISHMENT_TYPES } from "@models/chatPunishmentSchema";
 
 const LIST_DEFAULT_LIMIT = 20;
 const LIST_MAX_LIMIT = 50;
@@ -119,4 +120,15 @@ export const listChatsSchema = z
 export const chatParamsSchema = z.object({
   chatId: z.uuid("Sala inválida"),
   password: passwordSchema.optional(),
+});
+
+export const chatUserParamsSchema = z.object({
+  chatId: z.uuid("Sala inválida"),
+  userId: z.string().regex(/^[0-9a-f]{24}$/i, "Usuário inválido"),
+});
+
+export const punishBodySchema = z.object({
+  type: z
+    .enum(PUNISHMENT_TYPES, "Tipo de punição inválido")
+    .default("temporary"),
 });

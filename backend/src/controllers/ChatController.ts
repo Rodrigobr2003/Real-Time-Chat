@@ -3,13 +3,34 @@ import { z } from "zod";
 import { ConflictError } from "@errors/ConflictError";
 import { ForbiddenError } from "@errors/ForbiddenError";
 import { InvalidImageError } from "@errors/InvalidImageError";
+import { PunishedError } from "@errors/PunishedError";
 import type { ChatService } from "@services/ChatService";
 import {
   chatParamsSchema,
   chatSchema,
+  chatUserParamsSchema,
   listChatsSchema,
+  punishBodySchema,
   updateChatSchema,
 } from "@validations/chat";
+
+const parseTargetUser = (req: Request, res: Response) => {
+  const parsed = chatUserParamsSchema.safeParse(req.params);
+
+  if (!parsed.success) {
+    res.status(400).json({ errors: z.flattenError(parsed.error).fieldErrors });
+    return null;
+  }
+
+  if (parsed.data.userId === req.userId) {
+    res
+      .status(400)
+      .json({ message: "Você não pode aplicar essa ação em si mesmo" });
+    return null;
+  }
+
+  return { chatId: parsed.data.chatId, accountId: parsed.data.userId };
+};
 
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
@@ -181,6 +202,10 @@ export class ChatController {
 
       return res.status(204).send();
     } catch (err) {
+      if (err instanceof PunishedError) {
+        return res.status(403).json({ message: err.message });
+      }
+
       if (err instanceof ForbiddenError) {
         return res
           .status(403)
@@ -212,6 +237,104 @@ export class ChatController {
       }
 
       return res.status(200).json({ message: "Desconectado da sala" });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  };
+
+  listBlockedUsers = async (req: Request, res: Response) => {
+    const parsed = chatParamsSchema
+      .pick({ chatId: true })
+      .safeParse(req.params);
+
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ errors: z.flattenError(parsed.error).fieldErrors });
+    }
+
+    try {
+      const users = await this.chatService.listBlockedUsers(parsed.data.chatId);
+
+      if (!users) {
+        return res.status(404).json({ message: "Sala não encontrada" });
+      }
+
+      return res.status(200).json(users);
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  };
+
+  kick = async (req: Request, res: Response) => {
+    const target = parseTargetUser(req, res);
+
+    if (!target) return;
+
+    try {
+      await this.chatService.kickUser(target);
+      return res.status(200).json({ message: "Usuário retirado da sala" });
+    } catch (err) {
+      if (err instanceof ConflictError) {
+        return res.status(409).json({ message: err.message });
+      }
+
+      console.error(err);
+      return res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  };
+
+  punish = async (req: Request, res: Response) => {
+    const target = parseTargetUser(req, res);
+
+    if (!target) return;
+
+    const body = punishBodySchema.safeParse(req.body ?? {});
+
+    if (!body.success) {
+      return res
+        .status(400)
+        .json({ errors: z.flattenError(body.error).fieldErrors });
+    }
+
+    try {
+      const punishment = await this.chatService.punish({
+        ...target,
+        punishmentType: body.data.type,
+      });
+
+      if (!punishment) {
+        return res.status(404).json({ message: "Sala não encontrada" });
+      }
+
+      return res.status(200).json(punishment);
+    } catch (err) {
+      if (err instanceof ConflictError) {
+        return res.status(409).json({ message: err.message });
+      }
+
+      console.error(err);
+      return res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  };
+
+  unblock = async (req: Request, res: Response) => {
+    const target = parseTargetUser(req, res);
+
+    if (!target) return;
+
+    try {
+      const unblocked = await this.chatService.unblock(target);
+
+      if (!unblocked) {
+        return res
+          .status(404)
+          .json({ message: "Usuário não está bloqueado nesta sala" });
+      }
+
+      return res.status(200).json({ message: "Usuário desbloqueado" });
     } catch (err) {
       console.error(err);
       return res.status(500).json({ message: "Erro interno do servidor" });

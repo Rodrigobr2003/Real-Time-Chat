@@ -34,3 +34,7 @@ export const updateUserSchema = z
   .refine((data) => Object.keys(data).length > 0, {
     message: "Nenhum campo para atualizar",
   });
+
+export const userParamsSchema = z.object({
+  userId: z.uuid("User inválido"),
+});

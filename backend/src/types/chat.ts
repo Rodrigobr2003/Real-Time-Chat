@@ -39,9 +39,12 @@ export interface ListChatsInput extends ChatListFilters {
   limit: number;
 }
 
-export interface ChatConnectionInput {
+export interface ChatDefaultInput {
   accountId: string;
   chatId: string;
+}
+
+export interface ChatConnectionInput extends ChatDefaultInput {
   password?: string;
 }
 

@@ -5,6 +5,7 @@ import { ForbiddenError } from "@errors/ForbiddenError";
 import { ChatModel } from "@models/chatSchema";
 import type {
   ChatConnectionInput,
+  ChatDefaultInput,
   ChatList,
   ChatListFilters,
   ConnectedUser,
@@ -48,7 +49,8 @@ export interface IChatRepository {
   list(input: ListChatsInput): Promise<ChatList>;
   connect(input: ChatConnectionInput): Promise<boolean>;
   delete(chatId: string): Promise<boolean>;
-  disconnect(input: ChatConnectionInput): Promise<boolean>;
+  exists(chatId: string): Promise<boolean>;
+  disconnect(input: ChatDefaultInput): Promise<boolean>;
   listConnectedUsers(chatId: string): Promise<ConnectedUser[] | null>;
 }
 
@@ -66,6 +68,10 @@ export class MongoChatRepository implements IChatRepository {
     );
 
     return matchedCount > 0;
+  }
+
+  async exists(chatId: string) {
+    return !!(await ChatModel.exists({ chatId, deletedAt: null }));
   }
 
   async update(data: UpdateChatInput) {
@@ -177,7 +183,7 @@ export class MongoChatRepository implements IChatRepository {
     return matchedCount > 0;
   }
 
-  async disconnect(input: ChatConnectionInput) {
+  async disconnect(input: ChatDefaultInput) {
     const userId = new Types.ObjectId(input.accountId);
 
     const { modifiedCount } = await ChatModel.updateOne(
