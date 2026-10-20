@@ -104,6 +104,15 @@ const ChatSchema = new Schema(
         message: "A sala atingiu o limite de usuários",
       },
     },
+    chatAdmins: {
+      type: [{ type: Schema.Types.ObjectId, ref: "User" }],
+      default: [],
+    },
+    chatOwner: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
     deletedAt: {
       type: Date,
       default: null,

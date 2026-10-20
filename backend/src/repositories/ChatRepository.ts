@@ -10,9 +10,9 @@ import type {
   ChatListFilters,
   ConnectedUser,
   ConnectedUserDoc,
-  CreateChatInput,
   ListChatsInput,
   PublicChat,
+  SaveChatInput,
   UpdateChatInput,
 } from "@typings/chat";
 import { toConnectedUser, toPublicChat } from "@utils/serviceResponse";
@@ -44,7 +44,7 @@ const toListQuery = ({
 };
 
 export interface IChatRepository {
-  save(data: CreateChatInput): Promise<PublicChat>;
+  save(data: SaveChatInput): Promise<PublicChat>;
   update(data: UpdateChatInput): Promise<PublicChat | null>;
   list(input: ListChatsInput): Promise<ChatList>;
   connect(input: ChatConnectionInput): Promise<boolean>;
@@ -52,10 +52,12 @@ export interface IChatRepository {
   exists(chatId: string): Promise<boolean>;
   disconnect(input: ChatDefaultInput): Promise<boolean>;
   listConnectedUsers(chatId: string): Promise<ConnectedUser[] | null>;
+  verifyAdmin(input: ChatDefaultInput): Promise<boolean>;
+  verifyOwner(input: ChatDefaultInput): Promise<boolean>;
 }
 
 export class MongoChatRepository implements IChatRepository {
-  async save(data: CreateChatInput) {
+  async save(data: SaveChatInput) {
     const doc = await ChatModel.create(data);
 
     return toPublicChat(doc);
@@ -148,7 +150,7 @@ export class MongoChatRepository implements IChatRepository {
   }
 
   async connect(input: ChatConnectionInput) {
-    const userId = new Types.ObjectId(input.accountId);
+    const userId = new Types.ObjectId(input.userId);
 
     const chat = await ChatModel.findOne({
       chatId: input.chatId,
@@ -184,7 +186,7 @@ export class MongoChatRepository implements IChatRepository {
   }
 
   async disconnect(input: ChatDefaultInput) {
-    const userId = new Types.ObjectId(input.accountId);
+    const userId = new Types.ObjectId(input.userId);
 
     const { modifiedCount } = await ChatModel.updateOne(
       { chatId: input.chatId, usersConnected: userId },
@@ -192,5 +194,31 @@ export class MongoChatRepository implements IChatRepository {
     );
 
     return modifiedCount > 0;
+  }
+
+  async verifyAdmin(input: ChatDefaultInput) {
+    const { chatId, userId } = input;
+
+    const objectId = new Types.ObjectId(userId);
+
+    const isAdmin = await ChatModel.findOne({
+      chatId,
+      chatAdmins: { $in: [objectId] },
+    });
+
+    return !!isAdmin;
+  }
+
+  async verifyOwner(input: ChatDefaultInput) {
+    const { chatId, userId } = input;
+
+    const objectId = new Types.ObjectId(userId);
+
+    const isOwner = await ChatModel.findOne({
+      chatId,
+      chatOwner: objectId,
+    });
+
+    return !!isOwner;
   }
 }

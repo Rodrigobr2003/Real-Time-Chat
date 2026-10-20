@@ -21,7 +21,6 @@ const toPhotoDataURL = (photo: StoredPhoto, mimeType: string) =>
 
 export const toPublicUser = (doc: UserDoc): PublicUser => ({
   id: doc._id.toString(),
-  accountId: doc.accountId,
   name: doc.name,
   user: doc.user,
   email: doc.email,

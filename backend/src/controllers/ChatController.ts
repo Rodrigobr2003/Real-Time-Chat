@@ -29,7 +29,7 @@ const parseTargetUser = (req: Request, res: Response) => {
     return null;
   }
 
-  return { chatId: parsed.data.chatId, accountId: parsed.data.userId };
+  return { chatId: parsed.data.chatId, userId: parsed.data.userId };
 };
 
 export class ChatController {
@@ -48,7 +48,7 @@ export class ChatController {
     }
 
     try {
-      const chat = await this.chatService.createChat(parsed.data);
+      const chat = await this.chatService.createChat(req.userId!, parsed.data);
       return res.status(201).json(chat);
     } catch (err) {
       if (err instanceof InvalidImageError) {
@@ -83,7 +83,7 @@ export class ChatController {
     }
 
     try {
-      const chat = await this.chatService.updateChat({
+      const chat = await this.chatService.updateChat(req.userId!, {
         ...parsed.data,
         chatId: params.data.chatId,
       });
@@ -104,6 +104,10 @@ export class ChatController {
         return res.status(400).json({ errors: { chatPhoto: [err.message] } });
       }
 
+      if (err instanceof ForbiddenError) {
+        return res.status(403).json({ message: err.message });
+      }
+
       console.error(err);
       return res.status(500).json({ message: "Erro interno do servidor" });
     }
@@ -121,7 +125,10 @@ export class ChatController {
     }
 
     try {
-      const deleted = await this.chatService.delete(parsed.data.chatId);
+      const deleted = await this.chatService.delete({
+        userId: req.userId!,
+        chatId: parsed.data.chatId,
+      });
 
       if (!deleted) {
         return res.status(404).json({ message: "Sala não encontrada" });
@@ -129,6 +136,10 @@ export class ChatController {
 
       return res.status(200).json({ message: "Sala excluída" });
     } catch (err) {
+      if (err instanceof ForbiddenError) {
+        return res.status(403).json({ message: err.message });
+      }
+
       console.error(err);
       return res.status(500).json({ message: "Erro interno do servidor" });
     }
@@ -188,19 +199,19 @@ export class ChatController {
     }
 
     try {
-      const connected = await this.chatService.connectUser({
-        accountId: req.userId!,
+      const connection = await this.chatService.connectUser({
+        userId: req.userId!,
         chatId: parsed.data.chatId,
         password: parsed.data.password,
       });
 
-      if (!connected) {
+      if (!connection) {
         return res
           .status(409)
           .json({ message: "Sala não encontrada ou sem vagas" });
       }
 
-      return res.status(204).send();
+      return res.status(200).json(connection);
     } catch (err) {
       if (err instanceof PunishedError) {
         return res.status(403).json({ message: err.message });
@@ -228,7 +239,7 @@ export class ChatController {
 
     try {
       const disconnected = await this.chatService.disconnectUser({
-        accountId: req.userId!,
+        userId: req.userId!,
         chatId: parsed.data.chatId,
       });
 
@@ -255,7 +266,10 @@ export class ChatController {
     }
 
     try {
-      const users = await this.chatService.listBlockedUsers(parsed.data.chatId);
+      const users = await this.chatService.listBlockedUsers(
+        req.userId!,
+        parsed.data.chatId,
+      );
 
       if (!users) {
         return res.status(404).json({ message: "Sala não encontrada" });
@@ -263,6 +277,10 @@ export class ChatController {
 
       return res.status(200).json(users);
     } catch (err) {
+      if (err instanceof ForbiddenError) {
+        return res.status(403).json({ message: err.message });
+      }
+
       console.error(err);
       return res.status(500).json({ message: "Erro interno do servidor" });
     }
@@ -274,11 +292,15 @@ export class ChatController {
     if (!target) return;
 
     try {
-      await this.chatService.kickUser(target);
+      await this.chatService.kickUser(req.userId!, target);
       return res.status(200).json({ message: "Usuário retirado da sala" });
     } catch (err) {
       if (err instanceof ConflictError) {
         return res.status(409).json({ message: err.message });
+      }
+
+      if (err instanceof ForbiddenError) {
+        return res.status(403).json({ message: err.message });
       }
 
       console.error(err);
@@ -300,7 +322,7 @@ export class ChatController {
     }
 
     try {
-      const punishment = await this.chatService.punish({
+      const punishment = await this.chatService.punish(req.userId!, {
         ...target,
         punishmentType: body.data.type,
       });
@@ -315,6 +337,10 @@ export class ChatController {
         return res.status(409).json({ message: err.message });
       }
 
+      if (err instanceof ForbiddenError) {
+        return res.status(403).json({ message: err.message });
+      }
+
       console.error(err);
       return res.status(500).json({ message: "Erro interno do servidor" });
     }
@@ -326,7 +352,7 @@ export class ChatController {
     if (!target) return;
 
     try {
-      const unblocked = await this.chatService.unblock(target);
+      const unblocked = await this.chatService.unblock(req.userId!, target);
 
       if (!unblocked) {
         return res
@@ -336,6 +362,10 @@ export class ChatController {
 
       return res.status(200).json({ message: "Usuário desbloqueado" });
     } catch (err) {
+      if (err instanceof ForbiddenError) {
+        return res.status(403).json({ message: err.message });
+      }
+
       console.error(err);
       return res.status(500).json({ message: "Erro interno do servidor" });
     }

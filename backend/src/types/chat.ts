@@ -22,6 +22,11 @@ export interface CreateChatInput {
   password?: string | null;
 }
 
+export interface SaveChatInput extends CreateChatInput {
+  chatOwner: string;
+  chatAdmins: string[];
+}
+
 export interface UpdateChatInput extends Partial<CreateChatInput> {
   chatId: string;
 }
@@ -40,12 +45,17 @@ export interface ListChatsInput extends ChatListFilters {
 }
 
 export interface ChatDefaultInput {
-  accountId: string;
+  userId: string;
   chatId: string;
 }
 
 export interface ChatConnectionInput extends ChatDefaultInput {
   password?: string;
+}
+
+export interface ChatConnectionResult {
+  isAdmin: boolean;
+  isOwner: boolean;
 }
 
 export interface PublicChat {

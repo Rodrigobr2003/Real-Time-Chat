@@ -1,7 +1,11 @@
 import { hash, Algorithm } from "@node-rs/argon2";
 import { ConflictError } from "@errors/ConflictError";
+import { ForbiddenError } from "@errors/ForbiddenError";
 import { PunishedError } from "@errors/PunishedError";
-import { getNextPunishment } from "@models/chatPunishmentSchema";
+import {
+  getNextPunishment,
+  PUNISHMENT_DURATIONS_MS,
+} from "@models/chatPunishmentSchema";
 import type { IChatRepository } from "@repositories/ChatRepository";
 import type { IPunishmentRepository } from "@repositories/PunishmentRepository";
 import type {
@@ -12,6 +16,7 @@ import type {
   PublicChat,
   UpdateChatInput,
   ChatConnectionInput,
+  ChatConnectionResult,
 } from "@typings/chat";
 import type {
   ChatPunishmentDoc,
@@ -20,6 +25,8 @@ import type {
   PunishmentResult,
 } from "@typings/punishment";
 import { compressPhoto } from "@utils/image";
+
+const MAX_PUNISHMENT_DURATION_MS = PUNISHMENT_DURATIONS_MS.at(-1)!;
 
 const isActiveTemporary = (punishment: ChatPunishmentDoc | null) =>
   punishment?.type === "temporary" &&
@@ -35,7 +42,22 @@ export class ChatService {
     private readonly punishmentRepository: IPunishmentRepository,
   ) {}
 
-  async createChat(input: CreateChatInput): Promise<PublicChat> {
+  private async assertIsAdmin(input: ChatDefaultInput) {
+    if (!(await this.chatRepository.verifyAdmin(input))) {
+      throw new ForbiddenError("Apenas administradores podem fazer isso");
+    }
+  }
+
+  private async assertIsOwner(input: ChatDefaultInput) {
+    if (!(await this.chatRepository.verifyOwner(input))) {
+      throw new ForbiddenError("Apenas o dono da sala pode fazer isso");
+    }
+  }
+
+  async createChat(
+    userId: string,
+    input: CreateChatInput,
+  ): Promise<PublicChat> {
     if (input.password && input.privacy === "private") {
       input.password = await hash(input.password, {
         algorithm: Algorithm.Argon2id,
@@ -44,13 +66,20 @@ export class ChatService {
 
     return this.chatRepository.save({
       ...input,
+      chatOwner: userId,
+      chatAdmins: [userId],
       ...(input.chatPhoto && {
         chatPhoto: await compressPhoto(input.chatPhoto),
       }),
     });
   }
 
-  async updateChat(input: UpdateChatInput): Promise<PublicChat | null> {
+  async updateChat(
+    userId: string,
+    input: UpdateChatInput,
+  ): Promise<PublicChat | null> {
+    await this.assertIsAdmin({ userId, chatId: input.chatId });
+
     if (input.privacy === "public") {
       input.password = null;
     } else if (input.password) {
@@ -67,8 +96,10 @@ export class ChatService {
     });
   }
 
-  async delete(chatId: string): Promise<boolean> {
-    return this.chatRepository.delete(chatId);
+  async delete(input: ChatDefaultInput): Promise<boolean> {
+    await this.assertIsOwner(input);
+
+    return this.chatRepository.delete(input.chatId);
   }
 
   async listChats(input: ListChatsInput): Promise<ChatList> {
@@ -91,13 +122,20 @@ export class ChatService {
     }));
   }
 
-  async listBlockedUsers(chatId: string): Promise<ModeratedUser[] | null> {
+  async listBlockedUsers(
+    userId: string,
+    chatId: string,
+  ): Promise<ModeratedUser[] | null> {
     if (!(await this.chatRepository.exists(chatId))) return null;
+
+    await this.assertIsAdmin({ userId, chatId });
 
     return this.punishmentRepository.listBlocked(chatId);
   }
 
-  async connectUser(input: ChatConnectionInput): Promise<boolean> {
+  async connectUser(
+    input: ChatConnectionInput,
+  ): Promise<ChatConnectionResult | null> {
     const punishment = await this.punishmentRepository.find(input);
 
     if (punishment?.type === "blocked") {
@@ -111,14 +149,23 @@ export class ChatService {
       );
     }
 
-    return this.chatRepository.connect(input);
+    if (!(await this.chatRepository.connect(input))) return null;
+
+    const [isAdmin, isOwner] = await Promise.all([
+      this.chatRepository.verifyAdmin(input),
+      this.chatRepository.verifyOwner(input),
+    ]);
+
+    return { isAdmin, isOwner };
   }
 
   async disconnectUser(input: ChatDefaultInput): Promise<boolean> {
     return this.chatRepository.disconnect(input);
   }
 
-  async kickUser(input: ChatDefaultInput): Promise<boolean> {
+  async kickUser(userId: string, input: ChatDefaultInput): Promise<boolean> {
+    await this.assertIsAdmin({ userId, chatId: input.chatId });
+
     const disconnected = await this.chatRepository.disconnect(input);
 
     if (!disconnected) {
@@ -129,9 +176,18 @@ export class ChatService {
   }
 
   async punish(
+    userId: string,
     input: ChatPunishmentInterface,
   ): Promise<PunishmentResult | null> {
     if (!(await this.chatRepository.exists(input.chatId))) return null;
+
+    await this.assertIsAdmin({ userId, chatId: input.chatId });
+
+    const isTargetOwner = await this.chatRepository.verifyOwner(input);
+
+    if (isTargetOwner && input.punishmentType === "blocked") {
+      throw new ForbiddenError("O dono da sala não pode ser bloqueado");
+    }
 
     const current = await this.punishmentRepository.find(input);
 
@@ -143,10 +199,14 @@ export class ChatService {
       throw new ConflictError("Este usuário já está cumprindo uma punição");
     }
 
-    const next =
+    let next =
       input.punishmentType === "blocked"
         ? ({ type: "blocked" } as const)
         : getNextPunishment(current?.punishedCount ?? 0);
+
+    if (isTargetOwner && next.type === "blocked") {
+      next = { type: "temporary", durationMs: MAX_PUNISHMENT_DURATION_MS };
+    }
     const expiresAt =
       next.type === "temporary" && next.durationMs !== undefined
         ? new Date(Date.now() + next.durationMs)
@@ -154,7 +214,7 @@ export class ChatService {
 
     const punishment = await this.punishmentRepository.apply({
       chatId: input.chatId,
-      accountId: input.accountId,
+      userId: input.userId,
       type: next.type,
       expiresAt,
     });
@@ -168,7 +228,9 @@ export class ChatService {
     };
   }
 
-  async unblock(input: ChatDefaultInput): Promise<boolean> {
+  async unblock(userId: string, input: ChatDefaultInput): Promise<boolean> {
+    await this.assertIsAdmin({ userId, chatId: input.chatId });
+
     const current = await this.punishmentRepository.find(input);
 
     if (current?.type !== "blocked") return false;

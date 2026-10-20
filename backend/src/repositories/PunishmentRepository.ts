@@ -8,9 +8,9 @@ import type {
 } from "@typings/punishment";
 import { toConnectedUser } from "@utils/serviceResponse";
 
-const toQuery = ({ chatId, accountId }: ChatDefaultInput) => ({
+const toQuery = ({ chatId, userId }: ChatDefaultInput) => ({
   chatId,
-  user: new Types.ObjectId(accountId),
+  user: new Types.ObjectId(userId),
 });
 
 export interface IPunishmentRepository {
