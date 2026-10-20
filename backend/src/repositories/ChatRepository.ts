@@ -54,6 +54,7 @@ export interface IChatRepository {
   listConnectedUsers(chatId: string): Promise<ConnectedUser[] | null>;
   verifyAdmin(input: ChatDefaultInput): Promise<boolean>;
   verifyOwner(input: ChatDefaultInput): Promise<boolean>;
+  verifyConnectionStatus(input: ChatDefaultInput): Promise<boolean>;
 }
 
 export class MongoChatRepository implements IChatRepository {
@@ -224,5 +225,18 @@ export class MongoChatRepository implements IChatRepository {
     });
 
     return !!isOwner;
+  }
+
+  async verifyConnectionStatus(input: ChatDefaultInput) {
+    const { chatId, userId } = input;
+
+    const objectId = new Types.ObjectId(userId);
+
+    const isConnected = await ChatModel.findOne({
+      chatId,
+      usersConnected: { $in: [objectId] },
+    });
+
+    return !!isConnected;
   }
 }

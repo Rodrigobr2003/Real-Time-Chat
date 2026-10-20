@@ -5,10 +5,18 @@ import { uploadChatPhoto } from "@middlewares/uploadPhoto";
 import { MongoChatRepository } from "@repositories/ChatRepository";
 import { MongoPunishmentRepository } from "@repositories/PunishmentRepository";
 import { ChatService } from "@services/ChatService";
+import { MessageRepository } from "@repositories/MessageRepository";
 
 const repository = new MongoChatRepository();
 const punishmentRepository = new MongoPunishmentRepository();
-const service = new ChatService(repository, punishmentRepository);
+const messageRepository = new MessageRepository();
+
+const service = new ChatService(
+  repository,
+  punishmentRepository,
+  messageRepository,
+);
+
 const controller = new ChatController(service);
 
 const router = Router();
@@ -29,6 +37,19 @@ router.get("/:chatId/blocked-users", requireAuth, controller.listBlockedUsers);
 router.patch("/:chatId/users/:userId/kick", requireAuth, controller.kick);
 router.patch("/:chatId/users/:userId/punish", requireAuth, controller.punish);
 router.patch("/:chatId/users/:userId/unblock", requireAuth, controller.unblock);
+
+router.get("/:chatId/messages", requireAuth, controller.listMessages);
+router.post("/:chatId/messages", requireAuth, controller.sendMessage);
+router.patch(
+  "/:chatId/messages/:messageId",
+  requireAuth,
+  controller.editMessage,
+);
+router.delete(
+  "/:chatId/messages/:messageId",
+  requireAuth,
+  controller.deleteMessage,
+);
 
 export default (app: Application, versionPrefix: string) =>
   app.use(`${versionPrefix}chats/private`, router);

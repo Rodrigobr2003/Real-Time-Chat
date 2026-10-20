@@ -9,6 +9,7 @@ import {
   updateChat,
 } from "../api/chatHelpers";
 import { ChatHeader } from "../components/chat/ChatHeader";
+import { EditMessageModal } from "../components/chat/EditMessageModal";
 import { MessageBubble } from "../components/chat/MessageBubble";
 import { MessageInput } from "../components/chat/MessageInput";
 import {
@@ -17,14 +18,16 @@ import {
   type RoomSettingsChanges,
 } from "../components/chat/RoomSettingsModal";
 import { CHATS_QUERY_KEY } from "../context/chatListContextInstance";
+import { useAuth } from "../hooks/useAuth";
 import { useConnectedUsers } from "../hooks/useConnectedUsers";
-import { mockMessages } from "../mocks/messages";
+import { useMessages } from "../hooks/useMessages";
 import {
   CHAT_BG_COLORS,
   type IChatConnection,
   type IPublicChat,
   type IUpdateChatDTO,
 } from "../model/chatModel";
+import type { IMessage } from "../model/messageModel";
 import { getApiErrors } from "../utils/apiErrors";
 
 type ChatLocationState =
@@ -89,6 +92,21 @@ export default function Chat() {
     useConnectedUsers(roomId);
   const queryClient = useQueryClient();
   const pendingLeave = useRef<{ roomId: string; timer: number } | null>(null);
+  const currentUserId = useAuth().user?.id;
+  const [isConnected, setIsConnected] = useState(false);
+  const [editingMessage, setEditingMessage] = useState<IMessage | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const {
+    data: messages = [],
+    send,
+    edit,
+    remove,
+  } = useMessages(roomId, isConnected);
+  const lastMessageId = messages.at(-1)?.id;
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [lastMessageId]);
 
   useEffect(() => {
     if (pendingLeave.current?.roomId === roomId) {
@@ -101,6 +119,7 @@ export default function Chat() {
       .then((result) => {
         if (!isActive) return;
         setConnection(result);
+        setIsConnected(true);
         queryClient.invalidateQueries({ queryKey: CHATS_QUERY_KEY });
       })
       .catch((error) => {
@@ -126,6 +145,7 @@ export default function Chat() {
 
     return () => {
       isActive = false;
+      setIsConnected(false);
       window.removeEventListener("pagehide", leave);
       pendingLeave.current = { roomId, timer: window.setTimeout(leave, 0) };
     };
@@ -162,6 +182,27 @@ export default function Chat() {
       navigate("/home");
     },
   });
+
+  function handleSend() {
+    const content = text.trim();
+    if (!content) return;
+
+    send.mutate(content, { onSuccess: () => setText("") });
+  }
+
+  function openEditMessage(message: IMessage) {
+    edit.reset();
+    setEditingMessage(message);
+  }
+
+  function handleEditMessage(content: string) {
+    if (!editingMessage) return;
+
+    edit.mutate(
+      { id: editingMessage.id, content },
+      { onSuccess: () => setEditingMessage(null) },
+    );
+  }
 
   function openSettings() {
     resetSaveChat();
@@ -211,17 +252,35 @@ export default function Chat() {
 
         <Messages>
           <DayTag>Hoje</DayTag>
-          {mockMessages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
+          {messages.map((message) => (
+            <MessageBubble
+              key={message.id}
+              message={message}
+              mine={message.owner.id === currentUserId}
+              onEdit={openEditMessage}
+              onDelete={({ id }) => remove.mutate(id)}
+            />
           ))}
+          <div ref={messagesEndRef} />
         </Messages>
 
         <MessageInput
           value={text}
           onChange={setText}
-          onSend={() => setText("")}
+          onSend={handleSend}
+          disabled={!isConnected || send.isPending}
         />
       </Container>
+
+      {editingMessage && (
+        <EditMessageModal
+          message={editingMessage}
+          isSaving={edit.isPending}
+          error={edit.error ? getApiErrors(edit.error).message : undefined}
+          onClose={() => setEditingMessage(null)}
+          onSave={handleEditMessage}
+        />
+      )}
 
       {isSettingsOpen && (
         <RoomSettingsModal

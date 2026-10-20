@@ -13,6 +13,24 @@ import {
   punishBodySchema,
   updateChatSchema,
 } from "@validations/chat";
+import {
+  listMessagesSchema,
+  messageBodySchema,
+  messageParamsSchema,
+} from "@validations/message";
+
+const handleMessageError = (err: unknown, res: Response) => {
+  if (err instanceof ForbiddenError) {
+    return res.status(403).json({ message: err.message });
+  }
+
+  if (err instanceof ConflictError) {
+    return res.status(409).json({ message: err.message });
+  }
+
+  console.error(err);
+  return res.status(500).json({ message: "Erro interno do servidor" });
+};
 
 const parseTargetUser = (req: Request, res: Response) => {
   const parsed = chatUserParamsSchema.safeParse(req.params);
@@ -368,6 +386,134 @@ export class ChatController {
 
       console.error(err);
       return res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  };
+
+  listMessages = async (req: Request, res: Response) => {
+    const params = chatParamsSchema
+      .pick({ chatId: true })
+      .safeParse(req.params);
+    const query = listMessagesSchema.safeParse(req.query);
+
+    if (!params.success) {
+      return res
+        .status(400)
+        .json({ errors: z.flattenError(params.error).fieldErrors });
+    }
+
+    if (!query.success) {
+      return res
+        .status(400)
+        .json({ errors: z.flattenError(query.error).fieldErrors });
+    }
+
+    try {
+      const messages = await this.chatService.listMessages({
+        ...query.data,
+        userId: req.userId!,
+        chatId: params.data.chatId,
+      });
+
+      if (!messages) {
+        return res.status(404).json({ message: "Sala não encontrada" });
+      }
+
+      return res.status(200).json(messages);
+    } catch (err) {
+      return handleMessageError(err, res);
+    }
+  };
+
+  sendMessage = async (req: Request, res: Response) => {
+    const params = chatParamsSchema
+      .pick({ chatId: true })
+      .safeParse(req.params);
+    const body = messageBodySchema.safeParse(req.body ?? {});
+
+    if (!params.success) {
+      return res
+        .status(400)
+        .json({ errors: z.flattenError(params.error).fieldErrors });
+    }
+
+    if (!body.success) {
+      return res
+        .status(400)
+        .json({ errors: z.flattenError(body.error).fieldErrors });
+    }
+
+    try {
+      const message = await this.chatService.sendMessage({
+        userId: req.userId!,
+        chatId: params.data.chatId,
+        content: body.data.content,
+      });
+
+      if (!message) {
+        return res.status(404).json({ message: "Sala não encontrada" });
+      }
+
+      return res.status(201).json(message);
+    } catch (err) {
+      return handleMessageError(err, res);
+    }
+  };
+
+  editMessage = async (req: Request, res: Response) => {
+    const params = messageParamsSchema.safeParse(req.params);
+    const body = messageBodySchema.safeParse(req.body ?? {});
+
+    if (!params.success) {
+      return res
+        .status(400)
+        .json({ errors: z.flattenError(params.error).fieldErrors });
+    }
+
+    if (!body.success) {
+      return res
+        .status(400)
+        .json({ errors: z.flattenError(body.error).fieldErrors });
+    }
+
+    try {
+      const message = await this.chatService.editMessage({
+        ...params.data,
+        userId: req.userId!,
+        content: body.data.content,
+      });
+
+      if (!message) {
+        return res.status(404).json({ message: "Mensagem não encontrada" });
+      }
+
+      return res.status(200).json(message);
+    } catch (err) {
+      return handleMessageError(err, res);
+    }
+  };
+
+  deleteMessage = async (req: Request, res: Response) => {
+    const params = messageParamsSchema.safeParse(req.params);
+
+    if (!params.success) {
+      return res
+        .status(400)
+        .json({ errors: z.flattenError(params.error).fieldErrors });
+    }
+
+    try {
+      const message = await this.chatService.deleteMessage({
+        ...params.data,
+        userId: req.userId!,
+      });
+
+      if (!message) {
+        return res.status(404).json({ message: "Mensagem não encontrada" });
+      }
+
+      return res.status(200).json(message);
+    } catch (err) {
+      return handleMessageError(err, res);
     }
   };
 }

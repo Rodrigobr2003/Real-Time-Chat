@@ -1,11 +1,13 @@
 import { SendHorizontal } from "lucide-react";
 import type { FormEvent } from "react";
 import styled from "styled-components";
+import { MESSAGE_MAX_LENGTH } from "../../model/messageModel";
 
 type MessageInputProps = {
   value: string;
   onChange: (value: string) => void;
   onSend: () => void;
+  disabled?: boolean;
 };
 
 const Bar = styled.form`
@@ -60,10 +62,15 @@ const SendButton = styled.button`
   }
 `;
 
-export function MessageInput({ value, onChange, onSend }: MessageInputProps) {
+export function MessageInput({
+  value,
+  onChange,
+  onSend,
+  disabled = false,
+}: MessageInputProps) {
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (value.trim()) onSend();
+    if (value.trim() && !disabled) onSend();
   }
 
   return (
@@ -71,9 +78,10 @@ export function MessageInput({ value, onChange, onSend }: MessageInputProps) {
       <Field
         placeholder="Digite uma mensagem..."
         value={value}
+        maxLength={MESSAGE_MAX_LENGTH}
         onChange={(event) => onChange(event.target.value)}
       />
-      <SendButton type="submit" disabled={!value.trim()} aria-label="Enviar">
+      <SendButton type="submit" disabled={!value.trim() || disabled} aria-label="Enviar">
         <SendHorizontal size={20} />
       </SendButton>
     </Bar>

@@ -12,6 +12,7 @@ import type {
   ConnectedUserDoc,
   PublicChat,
 } from "@typings/chat";
+import type { MessageDoc, PublicMessage } from "@typings/message";
 import type { PublicUser, UserDoc } from "@typings/user";
 
 type StoredPhoto = { toString(encoding: "base64"): string } | null | undefined;
@@ -49,5 +50,21 @@ export const toPublicChat = (doc: ChatDoc): PublicChat => ({
   chatBgColor: doc.chatBgColor ?? CHAT_BACKGROUND_COLOR[0],
   chatPhotoURL: toPhotoDataURL(doc.chatPhoto, CHAT_PHOTO_MIME_TYPE),
   usersCount: doc.usersConnected.length,
+  createdAt: doc.createdAt,
+});
+
+export const toPublicMessage = (doc: MessageDoc): PublicMessage => ({
+  id: doc._id.toString(),
+  chatId: doc.chatId,
+  owner: {
+    id: doc.owner._id.toString(),
+    name: doc.owner.name,
+    user: doc.owner.user,
+    userPhotoURL: toPhotoDataURL(doc.owner.userPhoto, USER_PHOTO_MIME_TYPE),
+    profileBgColor: doc.owner.profileBgColor ?? USER_BACKGROUND_COLOR[0],
+  },
+  content: doc.deletedAt ? "" : doc.content,
+  editedAt: doc.editedAt ?? null,
+  deletedAt: doc.deletedAt ?? null,
   createdAt: doc.createdAt,
 });

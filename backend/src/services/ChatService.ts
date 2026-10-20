@@ -25,6 +25,14 @@ import type {
   PunishmentResult,
 } from "@typings/punishment";
 import { compressPhoto } from "@utils/image";
+import type { IMessageRepository } from "@repositories/MessageRepository";
+import type {
+  ListMessagesInput,
+  MessageDefaultInput,
+  MessageEditInput,
+  MessageTargetInput,
+  PublicMessage,
+} from "@typings/message";
 
 const MAX_PUNISHMENT_DURATION_MS = PUNISHMENT_DURATIONS_MS.at(-1)!;
 
@@ -40,6 +48,7 @@ export class ChatService {
   constructor(
     private readonly chatRepository: IChatRepository,
     private readonly punishmentRepository: IPunishmentRepository,
+    private readonly messageRespository: IMessageRepository,
   ) {}
 
   private async assertIsAdmin(input: ChatDefaultInput) {
@@ -51,6 +60,12 @@ export class ChatService {
   private async assertIsOwner(input: ChatDefaultInput) {
     if (!(await this.chatRepository.verifyOwner(input))) {
       throw new ForbiddenError("Apenas o dono da sala pode fazer isso");
+    }
+  }
+
+  private async isUserConnected(input: ChatDefaultInput) {
+    if (!(await this.chatRepository.verifyConnectionStatus(input))) {
+      throw new ForbiddenError("O usuário não está conectado à sala");
     }
   }
 
@@ -78,7 +93,10 @@ export class ChatService {
     userId: string,
     input: UpdateChatInput,
   ): Promise<PublicChat | null> {
-    await this.assertIsAdmin({ userId, chatId: input.chatId });
+    const { chatId } = input;
+
+    await this.isUserConnected({ userId, chatId });
+    await this.assertIsAdmin({ userId, chatId });
 
     if (input.privacy === "public") {
       input.password = null;
@@ -97,6 +115,7 @@ export class ChatService {
   }
 
   async delete(input: ChatDefaultInput): Promise<boolean> {
+    await this.isUserConnected(input);
     await this.assertIsOwner(input);
 
     return this.chatRepository.delete(input.chatId);
@@ -164,6 +183,7 @@ export class ChatService {
   }
 
   async kickUser(userId: string, input: ChatDefaultInput): Promise<boolean> {
+    await this.isUserConnected({ userId, chatId: input.chatId });
     await this.assertIsAdmin({ userId, chatId: input.chatId });
 
     const disconnected = await this.chatRepository.disconnect(input);
@@ -181,6 +201,7 @@ export class ChatService {
   ): Promise<PunishmentResult | null> {
     if (!(await this.chatRepository.exists(input.chatId))) return null;
 
+    await this.isUserConnected({ userId, chatId: input.chatId });
     await this.assertIsAdmin({ userId, chatId: input.chatId });
 
     const isTargetOwner = await this.chatRepository.verifyOwner(input);
@@ -229,6 +250,7 @@ export class ChatService {
   }
 
   async unblock(userId: string, input: ChatDefaultInput): Promise<boolean> {
+    await this.isUserConnected({ userId, chatId: input.chatId });
     await this.assertIsAdmin({ userId, chatId: input.chatId });
 
     const current = await this.punishmentRepository.find(input);
@@ -236,5 +258,61 @@ export class ChatService {
     if (current?.type !== "blocked") return false;
 
     return this.punishmentRepository.reset(input);
+  }
+
+  private async assertCanChangeMessage(input: MessageTargetInput) {
+    const message = await this.messageRespository.find(input);
+
+    if (!message) return false;
+
+    if (message.owner !== input.userId) {
+      throw new ForbiddenError("Você só pode alterar suas próprias mensagens");
+    }
+
+    if (message.deletedAt) {
+      throw new ConflictError("Esta mensagem foi apagada");
+    }
+
+    return true;
+  }
+
+  async listMessages(
+    input: ListMessagesInput,
+  ): Promise<PublicMessage[] | null> {
+    if (!(await this.chatRepository.exists(input.chatId))) return null;
+
+    await this.isUserConnected(input);
+
+    return this.messageRespository.list(input);
+  }
+
+  async sendMessage(input: MessageDefaultInput): Promise<PublicMessage | null> {
+    if (!(await this.chatRepository.exists(input.chatId))) return null;
+
+    await this.isUserConnected(input);
+
+    return this.messageRespository.create(input);
+  }
+
+  async editMessage(input: MessageEditInput): Promise<PublicMessage | null> {
+    if (!(await this.chatRepository.exists(input.chatId))) return null;
+
+    await this.isUserConnected(input);
+
+    if (!(await this.assertCanChangeMessage(input))) return null;
+
+    return this.messageRespository.update(input);
+  }
+
+  async deleteMessage(
+    input: MessageTargetInput,
+  ): Promise<PublicMessage | null> {
+    if (!(await this.chatRepository.exists(input.chatId))) return null;
+
+    await this.isUserConnected(input);
+
+    if (!(await this.assertCanChangeMessage(input))) return null;
+
+    return this.messageRespository.delete(input);
   }
 }
