@@ -18,7 +18,7 @@ type ChatHeaderProps = {
   connectedUsers: IConnectedUser[];
   isLoadingUsers: boolean;
   onBack: () => void;
-  onOpenSettings: () => void;
+  onOpenSettings?: () => void;
 };
 
 const Header = styled.header`
@@ -136,9 +136,11 @@ export function ChatHeader({
           · sala {roomId}
         </Details>
       </Info>
-      <IconButton aria-label="Mais opções" onClick={onOpenSettings}>
-        <MoreVertical size={20} />
-      </IconButton>
+      {onOpenSettings && (
+        <IconButton aria-label="Mais opções" onClick={onOpenSettings}>
+          <MoreVertical size={20} />
+        </IconButton>
+      )}
 
       {photoURL && (
         <Modal title={roomName} open={isPhotoOpen} onClose={() => setIsPhotoOpen(false)}>

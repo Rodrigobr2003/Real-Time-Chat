@@ -1,5 +1,6 @@
 import { api } from "./client";
 import type {
+  IChatConnection,
   IChatList,
   IConnectChatDTO,
   IConnectedUser,
@@ -39,9 +40,12 @@ export const createChat = async (createDTO: ICreateChatDTO) => {
 };
 
 export const connectChat = async ({ chatId, password }: IConnectChatDTO) => {
-  await api.patch(`${PRIVATE_CHAT_DEFAULT_PATH}/${chatId}/connect`, {
-    password,
-  });
+  const { data } = await api.patch<IChatConnection>(
+    `${PRIVATE_CHAT_DEFAULT_PATH}/${chatId}/connect`,
+    { password },
+  );
+
+  return data;
 };
 
 export const updateChat = async (
@@ -75,6 +79,16 @@ export const deleteChat = async (chatId: string) => {
 export const disconnectChat = async (chatId: string) => {
   await api.patch(`${PRIVATE_CHAT_DEFAULT_PATH}/${chatId}/disconnect`);
 };
+
+export const leaveChat = (chatId: string) =>
+  fetch(
+    `${api.defaults.baseURL}${PRIVATE_CHAT_DEFAULT_PATH}/${chatId}/disconnect`,
+    {
+      method: "PATCH",
+      credentials: "include",
+      keepalive: true,
+    },
+  );
 
 export const listBlockedUsers = async (chatId: string) => {
   const { data } = await api.get<IConnectedUser[]>(

@@ -49,6 +49,11 @@ export interface IConnectChatDTO {
   password?: string;
 }
 
+export interface IChatConnection {
+  isAdmin: boolean;
+  isOwner: boolean;
+}
+
 export interface IConnectedUser {
   id: string;
   name: string;

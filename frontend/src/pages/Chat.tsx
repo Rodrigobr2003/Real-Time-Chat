@@ -1,8 +1,13 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import styled from "styled-components";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { deleteChat, disconnectChat, updateChat } from "../api/chatHelpers";
+import {
+  connectChat,
+  deleteChat,
+  leaveChat,
+  updateChat,
+} from "../api/chatHelpers";
 import { ChatHeader } from "../components/chat/ChatHeader";
 import { MessageBubble } from "../components/chat/MessageBubble";
 import { MessageInput } from "../components/chat/MessageInput";
@@ -16,12 +21,15 @@ import { useConnectedUsers } from "../hooks/useConnectedUsers";
 import { mockMessages } from "../mocks/messages";
 import {
   CHAT_BG_COLORS,
+  type IChatConnection,
   type IPublicChat,
   type IUpdateChatDTO,
 } from "../model/chatModel";
 import { getApiErrors } from "../utils/apiErrors";
 
-type ChatLocationState = { room?: IPublicChat } | null;
+type ChatLocationState =
+  | ({ room?: IPublicChat } & Partial<IChatConnection>)
+  | null;
 
 const Page = styled.main`
   height: 100%;
@@ -62,7 +70,13 @@ export default function Chat() {
   const navigate = useNavigate();
   const { roomId = "" } = useParams();
   const [text, setText] = useState("");
-  const room = (useLocation().state as ChatLocationState)?.room;
+  const locationState = useLocation().state as ChatLocationState;
+  const room = locationState?.room;
+  const [connection, setConnection] = useState<IChatConnection>({
+    isAdmin: locationState?.isAdmin ?? false,
+    isOwner: locationState?.isOwner ?? false,
+  });
+  const { isAdmin, isOwner } = connection;
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settings, setSettings] = useState<RoomSettings>(() => ({
     name: room?.name ?? "Sala",
@@ -74,13 +88,48 @@ export default function Chat() {
   const { data: connectedUsers = [], isPending: isLoadingUsers } =
     useConnectedUsers(roomId);
   const queryClient = useQueryClient();
-  const { mutate: disconnect, isPending: isDisconnecting } = useMutation({
-    mutationFn: disconnectChat,
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: CHATS_QUERY_KEY });
-      navigate("/home");
-    },
-  });
+  const pendingLeave = useRef<{ roomId: string; timer: number } | null>(null);
+
+  useEffect(() => {
+    if (pendingLeave.current?.roomId === roomId) {
+      clearTimeout(pendingLeave.current.timer);
+    }
+    pendingLeave.current = null;
+
+    let isActive = true;
+    connectChat({ chatId: roomId })
+      .then((result) => {
+        if (!isActive) return;
+        setConnection(result);
+        queryClient.invalidateQueries({ queryKey: CHATS_QUERY_KEY });
+      })
+      .catch((error) => {
+        if (!isActive) return;
+        navigate("/home", {
+          replace: true,
+          state: { joinError: getApiErrors(error).message },
+        });
+      });
+
+    let hasLeft = false;
+    const leave = () => {
+      if (hasLeft) return;
+      hasLeft = true;
+      leaveChat(roomId)
+        .catch(() => {})
+        .finally(() =>
+          queryClient.invalidateQueries({ queryKey: CHATS_QUERY_KEY }),
+        );
+    };
+
+    window.addEventListener("pagehide", leave);
+
+    return () => {
+      isActive = false;
+      window.removeEventListener("pagehide", leave);
+      pendingLeave.current = { roomId, timer: window.setTimeout(leave, 0) };
+    };
+  }, [roomId, queryClient, navigate]);
 
   const {
     mutate: saveChat,
@@ -156,7 +205,7 @@ export default function Chat() {
           color={settings.chatBgColor}
           connectedUsers={connectedUsers}
           isLoadingUsers={isLoadingUsers}
-          onBack={() => !isDisconnecting && disconnect(roomId)}
+          onBack={() => navigate("/home")}
           onOpenSettings={openSettings}
         />
 
@@ -177,13 +226,14 @@ export default function Chat() {
       {isSettingsOpen && (
         <RoomSettingsModal
           chatId={roomId}
+          canEdit={isAdmin}
           settings={settings}
           connectedUsers={connectedUsers}
           onClose={() => setIsSettingsOpen(false)}
           onSave={handleSaveSettings}
           isSaving={isSavingChat}
           saveError={saveChatError && getApiErrors(saveChatError)}
-          onDelete={() => removeChat(roomId)}
+          onDelete={isOwner ? () => removeChat(roomId) : undefined}
           isDeleting={isDeletingChat}
           deleteError={deleteChatError && getApiErrors(deleteChatError).message}
         />

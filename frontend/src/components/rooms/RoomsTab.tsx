@@ -1,6 +1,6 @@
 import { CloudOff, MessagesSquare, Plus, SearchX } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { useChat } from "../../hooks/useChat";
 import { useChatList } from "../../hooks/useChatList";
@@ -91,7 +91,8 @@ export function RoomsTab() {
     isFetchingNextChatsPage,
   } = useChatList();
   const { connectChatMutation, isConnectPending } = useChat();
-  const [joinError, setJoinError] = useState("");
+  const locationState = useLocation().state as { joinError?: string } | null;
+  const [joinError, setJoinError] = useState(locationState?.joinError ?? "");
   const [privateRoom, setPrivateRoom] = useState<IPublicChat | null>(null);
 
   function openRoom(room: IPublicChat) {
@@ -101,7 +102,8 @@ export function RoomsTab() {
     if (isConnectPending) return;
 
     connectChatMutation({ chatId: room.chatId }, {
-      onSuccess: () => navigate(`/chat/${room.chatId}`, { state: { room } }),
+      onSuccess: (connection) =>
+        navigate(`/chat/${room.chatId}`, { state: { room, ...connection } }),
       onError: (error) => setJoinError(getApiErrors(error).message),
     });
   }

@@ -65,14 +65,20 @@ type RoomSettingsModalProps = {
   chatId: string;
   settings: RoomSettings;
   connectedUsers: IConnectedUser[];
+  canEdit?: boolean;
   onClose: () => void;
   onSave: (changes: RoomSettingsChanges) => void;
-  onDelete: () => void;
+  onDelete?: () => void;
   isDeleting?: boolean;
   deleteError?: string | null;
   isSaving?: boolean;
   saveError?: { message: string; fields?: Record<string, string> } | null;
 };
+
+const ReadOnlyPhoto = styled.div`
+  align-self: center;
+  display: flex;
+`;
 
 const PhotoButton = styled.button`
   position: relative;
@@ -443,6 +449,7 @@ export function RoomSettingsModal({
   chatId,
   settings,
   connectedUsers,
+  canEdit = true,
   onClose,
   onSave,
   onDelete,
@@ -463,7 +470,7 @@ export function RoomSettingsModal({
   const [chatPhoto, setChatPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const { blockedUsersQuery, kick, punish, unblock } =
-    useRoomModeration(chatId);
+    useRoomModeration(chatId, canEdit);
   const [moderationError, setModerationError] = useState("");
   const [userToPunish, setUserToPunish] = useState<IConnectedUser | null>(null);
   const [userToBlock, setUserToBlock] = useState<IConnectedUser | null>(null);
@@ -593,7 +600,7 @@ export function RoomSettingsModal({
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
 
-    if (!isNameValid || !isPasswordValid) return;
+    if (!canEdit || !isNameValid || !isPasswordValid) return;
 
     onSave({
       name: name.trim(),
@@ -608,30 +615,47 @@ export function RoomSettingsModal({
   }
 
   return (
-    <Modal title="Configurações da sala" open onClose={onClose}>
+    <Modal
+      title={canEdit ? "Configurações da sala" : "Informações da sala"}
+      open
+      onClose={onClose}
+    >
       <Form onSubmit={handleSubmit}>
-        <input
-          ref={photoInputRef}
-          type="file"
-          accept={CHAT_PHOTO_ACCEPTED_TYPES.join(",")}
-          onChange={handlePhotoChange}
-          hidden
-        />
-        <PhotoButton
-          type="button"
-          onClick={() => photoInputRef.current?.click()}
-          aria-label="Alterar foto da sala"
-        >
-          <Avatar
-            size={96}
-            name={name || settings.name}
-            src={photoURL ?? undefined}
-            color={chatBgColor}
-          />
-          <span>
-            <Camera size={28} />
-          </span>
-        </PhotoButton>
+        {canEdit ? (
+          <>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept={CHAT_PHOTO_ACCEPTED_TYPES.join(",")}
+              onChange={handlePhotoChange}
+              hidden
+            />
+            <PhotoButton
+              type="button"
+              onClick={() => photoInputRef.current?.click()}
+              aria-label="Alterar foto da sala"
+            >
+              <Avatar
+                size={96}
+                name={name || settings.name}
+                src={photoURL ?? undefined}
+                color={chatBgColor}
+              />
+              <span>
+                <Camera size={28} />
+              </span>
+            </PhotoButton>
+          </>
+        ) : (
+          <ReadOnlyPhoto>
+            <Avatar
+              size={96}
+              name={settings.name}
+              src={photoURL ?? undefined}
+              color={chatBgColor}
+            />
+          </ReadOnlyPhoto>
+        )}
         {(photoError || fieldErrors.chatPhoto) && (
           <FieldError>{photoError || fieldErrors.chatPhoto}</FieldError>
         )}
@@ -666,13 +690,15 @@ export function RoomSettingsModal({
         ) : (
           <NameRow>
             <strong>{name}</strong>
-            <PencilButton
-              type="button"
-              aria-label="Editar nome da sala"
-              onClick={() => setIsEditingName(true)}
-            >
-              <Pencil size={16} />
-            </PencilButton>
+            {canEdit && (
+              <PencilButton
+                type="button"
+                aria-label="Editar nome da sala"
+                onClick={() => setIsEditingName(true)}
+              >
+                <Pencil size={16} />
+              </PencilButton>
+            )}
           </NameRow>
         )}
 
@@ -686,14 +712,16 @@ export function RoomSettingsModal({
               </small>
             </span>
           </div>
-          <Switch
-            type="button"
-            role="switch"
-            aria-checked={isPrivate}
-            aria-label="Sala privada"
-            $checked={isPrivate}
-            onClick={() => setPrivacy(isPrivate ? "public" : "private")}
-          />
+          {canEdit && (
+            <Switch
+              type="button"
+              role="switch"
+              aria-checked={isPrivate}
+              aria-label="Sala privada"
+              $checked={isPrivate}
+              onClick={() => setPrivacy(isPrivate ? "public" : "private")}
+            />
+          )}
         </LimitRow>
 
         <Group>
@@ -726,7 +754,7 @@ export function RoomSettingsModal({
                     </strong>
                     <small>@{user.user}</small>
                   </UserInfo>
-                  {user.id !== currentUserId && (
+                  {canEdit && user.id !== currentUserId && (
                     <RowAction
                       type="button"
                       title="Opções"
@@ -752,7 +780,7 @@ export function RoomSettingsModal({
             !userToUnblock && <FieldError>{moderationError}</FieldError>}
         </Group>
 
-        {blockedUsers.length > 0 && (
+        {canEdit && blockedUsers.length > 0 && (
           <Group>
             <GroupLabel>Bloqueados</GroupLabel>
             <UserList>
@@ -787,11 +815,14 @@ export function RoomSettingsModal({
             <Users size={18} />
             <span>
               Limite de pessoas
-              <small>
-                Entre {minLimit} e {CHAT_MAX_USERS}
-              </small>
+              {canEdit && (
+                <small>
+                  Entre {minLimit} e {CHAT_MAX_USERS}
+                </small>
+              )}
             </span>
           </div>
+          {canEdit ? (
           <Stepper>
             <StepButton
               type="button"
@@ -832,12 +863,15 @@ export function RoomSettingsModal({
               <Plus size={16} />
             </StepButton>
           </Stepper>
+          ) : (
+            <strong>{userLimit}</strong>
+          )}
         </LimitRow>
         {fieldErrors.userLimit && (
           <FieldError>{fieldErrors.userLimit}</FieldError>
         )}
 
-        {isPrivate && (
+        {canEdit && isPrivate && (
           <Label>
             {needsPassword ? "Senha da sala" : "Nova senha"}
             <Input
@@ -862,7 +896,7 @@ export function RoomSettingsModal({
           </Label>
         )}
 
-        {!photoURL && (
+        {canEdit && !photoURL && (
           <Group>
             <GroupLabel>Cor da sala</GroupLabel>
             <Swatches>
@@ -882,35 +916,45 @@ export function RoomSettingsModal({
           </Group>
         )}
 
-        <DeleteButton
-          type="button"
-          $variant="ghost"
-          onClick={() => setIsConfirmingDelete(true)}
-        >
-          <Trash2 size={16} />
-          Excluir sala
-        </DeleteButton>
+        {onDelete && (
+          <DeleteButton
+            type="button"
+            $variant="ghost"
+            onClick={() => setIsConfirmingDelete(true)}
+          >
+            <Trash2 size={16} />
+            Excluir sala
+          </DeleteButton>
+        )}
 
         {saveError && !hasFieldErrors && (
           <FieldError>{saveError.message}</FieldError>
         )}
 
         <Actions>
-          <Button type="button" $variant="ghost" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            disabled={!isNameValid || !isPasswordValid || isSaving}
-          >
-            {isSaving ? "Salvando..." : "Salvar"}
-          </Button>
+          {canEdit ? (
+            <>
+              <Button type="button" $variant="ghost" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={!isNameValid || !isPasswordValid || isSaving}
+              >
+                {isSaving ? "Salvando..." : "Salvar"}
+              </Button>
+            </>
+          ) : (
+            <Button type="button" onClick={onClose}>
+              Fechar
+            </Button>
+          )}
         </Actions>
       </Form>
 
       <Modal
         title="Excluir sala"
-        open={isConfirmingDelete}
+        open={!!onDelete && isConfirmingDelete}
         onClose={() => setIsConfirmingDelete(false)}
       >
         <ConfirmText>

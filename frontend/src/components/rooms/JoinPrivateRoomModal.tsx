@@ -68,9 +68,9 @@ export function JoinPrivateRoomModal({ room, onClose }: JoinPrivateRoomModalProp
     connectChatMutation(
       { chatId: room.chatId, password },
       {
-        onSuccess: () => {
+        onSuccess: (connection) => {
           handleClose();
-          navigate(`/chat/${room.chatId}`, { state: { room } });
+          navigate(`/chat/${room.chatId}`, { state: { room, ...connection } });
         },
         onError: (apiError) => {
           const { message, fields } = getApiErrors(apiError);

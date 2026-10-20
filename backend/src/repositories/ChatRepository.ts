@@ -156,12 +156,16 @@ export class MongoChatRepository implements IChatRepository {
       chatId: input.chatId,
       deletedAt: null,
     })
-      .select("+password privacy")
+      .select("+password privacy usersConnected")
       .lean();
 
     if (!chat) return false;
 
-    if (chat.privacy === "private") {
+    const isAlreadyConnected = chat.usersConnected.some((id) =>
+      id.equals(userId),
+    );
+
+    if (chat.privacy === "private" && !isAlreadyConnected) {
       const passwordMatches =
         !!chat.password &&
         !!input.password &&

@@ -1,6 +1,7 @@
 import { createContext } from "react";
 import type { UseMutateFunction } from "@tanstack/react-query";
 import type {
+  IChatConnection,
   IConnectChatDTO,
   ICreateChatDTO,
   IPublicChat,
@@ -15,7 +16,11 @@ export interface IChatContext {
   resetCreateChatDTO: () => void;
   createChatMutation: UseMutateFunction<IPublicChat, Error, ICreateChatDTO>;
   isCreatePending: boolean;
-  connectChatMutation: UseMutateFunction<void, Error, IConnectChatDTO>;
+  connectChatMutation: UseMutateFunction<
+    IChatConnection,
+    Error,
+    IConnectChatDTO
+  >;
   isConnectPending: boolean;
 }
 

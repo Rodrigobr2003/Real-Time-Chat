@@ -42,7 +42,6 @@ export type IUpdateUserDTO = Partial<Omit<IUserProfileFields, "userPhoto">> & {
 
 export interface IPublicUser {
   id: string;
-  accountId: string;
   name: string;
   user: string;
   email: string;

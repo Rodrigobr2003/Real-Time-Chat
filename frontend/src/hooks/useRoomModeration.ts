@@ -8,14 +8,14 @@ import {
 import { CHATS_QUERY_KEY } from "../context/chatListContextInstance";
 import type { PunishmentType } from "../model/chatModel";
 
-export const useRoomModeration = (chatId: string) => {
+export const useRoomModeration = (chatId: string, enabled = true) => {
   const queryClient = useQueryClient();
   const roomKey = [...CHATS_QUERY_KEY, chatId];
 
   const blockedUsersQuery = useQuery({
     queryKey: [...roomKey, "blocked-users"],
     queryFn: () => listBlockedUsers(chatId),
-    enabled: !!chatId,
+    enabled: !!chatId && enabled,
   });
 
   const onSuccess = () => queryClient.invalidateQueries({ queryKey: roomKey });
