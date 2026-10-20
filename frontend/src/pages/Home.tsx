@@ -1,5 +1,5 @@
 import { MessagesSquare, UserRound } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { ProfileTab } from "../components/profile/ProfileTab";
@@ -7,6 +7,7 @@ import { RoomsTab } from "../components/rooms/RoomsTab";
 import { Card, CenteredPage } from "../components/ui/Card";
 import { Tab, Tabs } from "../components/ui/Tabs";
 import { useAuth } from "../hooks/useAuth";
+import { useChatList } from "../hooks/useChatList";
 import type { IPublicUser } from "../model/userModel";
 import { mockProfile, type Profile } from "../mocks/profile";
 
@@ -41,6 +42,12 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<HomeTab>("rooms");
   const { user, logoutMutation, isLogoutPending } = useAuth();
   const profile = toProfile(user);
+  const { setChatsPolling } = useChatList();
+
+  useEffect(() => {
+    setChatsPolling(true);
+    return () => setChatsPolling(false);
+  }, [setChatsPolling]);
 
   function handleLogout() {
     logoutMutation(undefined, {

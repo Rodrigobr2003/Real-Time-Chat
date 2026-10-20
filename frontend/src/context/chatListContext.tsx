@@ -23,6 +23,7 @@ type ChatListQuery = Omit<IListChatsParams, "skip" | "limit">;
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
+const POLLING_INTERVAL_MS = 5000;
 
 const PEOPLE_RANGES: Record<PeopleFilter, ChatListQuery> = {
   any: {},
@@ -45,6 +46,7 @@ const toListQuery = (
 export const ChatListProvider = ({ children }: IChatListProvider) => {
   const { user } = useAuth();
   const [filters, setFilters] = useState<IChatFilters>(INITIAL_CHAT_FILTERS);
+  const [isChatsPolling, setChatsPolling] = useState(false);
 
   const search = useDebouncedValue(filters.search.trim(), SEARCH_DEBOUNCE_MS);
 
@@ -75,11 +77,15 @@ export const ChatListProvider = ({ children }: IChatListProvider) => {
       listChats({ ...listQuery, skip: pageParam, limit: PAGE_SIZE }),
     initialPageParam: 0,
     getNextPageParam: (lastPage, pages) => {
-      const loaded = pages.reduce((count, page) => count + page.chats.length, 0);
+      const loaded = pages.reduce(
+        (count, page) => count + page.chats.length,
+        0,
+      );
       return loaded < lastPage.total ? loaded : undefined;
     },
     placeholderData: keepPreviousData,
     enabled: !!user,
+    refetchInterval: isChatsPolling ? POLLING_INTERVAL_MS : false,
   });
 
   const chats = useMemo(
@@ -110,6 +116,7 @@ export const ChatListProvider = ({ children }: IChatListProvider) => {
       fetchNextChatsPage,
       hasNextChatsPage,
       isFetchingNextChatsPage,
+      setChatsPolling,
     }),
     [
       filters,

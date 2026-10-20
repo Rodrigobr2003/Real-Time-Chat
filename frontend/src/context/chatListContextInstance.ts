@@ -16,6 +16,7 @@ export interface IChatListContext {
   fetchNextChatsPage: () => void;
   hasNextChatsPage: boolean;
   isFetchingNextChatsPage: boolean;
+  setChatsPolling: (enabled: boolean) => void;
 }
 
 export const ChatListContext = createContext<IChatListContext | null>(null);
