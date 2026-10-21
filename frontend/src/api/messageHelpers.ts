@@ -3,8 +3,14 @@ import type { IMessage } from "../model/messageModel";
 
 const messagesPath = (chatId: string) => `/chats/private/${chatId}/messages`;
 
-export const listMessages = async (chatId: string) => {
-  const { data } = await api.get<IMessage[]>(messagesPath(chatId));
+export const listMessages = async (
+  chatId: string,
+  limit: number,
+  before?: string,
+) => {
+  const { data } = await api.get<IMessage[]>(messagesPath(chatId), {
+    params: { limit, before },
+  });
 
   return data;
 };

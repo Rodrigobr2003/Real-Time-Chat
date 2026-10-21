@@ -1,4 +1,5 @@
 export const MESSAGE_MAX_LENGTH = 500;
+export const MESSAGES_PAGE_SIZE = 30;
 
 export interface IMessageOwner {
   id: string;

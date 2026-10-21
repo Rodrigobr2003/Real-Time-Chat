@@ -2,7 +2,7 @@ import { Schema, model, type InferSchemaType } from "mongoose";
 
 export const MESSAGE_MIN_LENGTH = 1;
 export const MESSAGE_MAX_LENGTH = 500;
-export const MESSAGE_LIST_DEFAULT_LIMIT = 50;
+export const MESSAGE_LIST_DEFAULT_LIMIT = 30;
 export const MESSAGE_LIST_MAX_LIMIT = 100;
 
 const ChatMessagesSchema = new Schema(

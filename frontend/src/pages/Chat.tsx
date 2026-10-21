@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import styled from "styled-components";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -29,6 +29,7 @@ import {
 } from "../model/chatModel";
 import type { IMessage } from "../model/messageModel";
 import { getApiErrors } from "../utils/apiErrors";
+import { formatDayLabel, getDayKey } from "../utils/messageDate";
 
 type ChatLocationState =
   | ({ room?: IPublicChat } & Partial<IChatConnection>)
@@ -61,7 +62,7 @@ const Messages = styled.section`
 
 const DayTag = styled.span`
   align-self: center;
-  margin-bottom: 8px;
+  margin-block: 8px;
   padding: 4px 12px;
   font-size: 12px;
   border-radius: ${({ theme }) => theme.radius.full};
@@ -95,18 +96,59 @@ export default function Chat() {
   const currentUserId = useAuth().user?.id;
   const [isConnected, setIsConnected] = useState(false);
   const [editingMessage, setEditingMessage] = useState<IMessage | null>(null);
+  const messagesRef = useRef<HTMLElement>(null);
+  const messagesTopRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollHeightBeforeLoad = useRef<number | null>(null);
   const {
-    data: messages = [],
+    messages,
     send,
     edit,
     remove,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
   } = useMessages(roomId, isConnected);
+  const firstMessageId = messages[0]?.id;
   const lastMessageId = messages.at(-1)?.id;
+  const previousLastMessageId = useRef<string | undefined>(undefined);
+
+  useLayoutEffect(() => {
+    const container = messagesRef.current;
+    if (!container || scrollHeightBeforeLoad.current === null) return;
+
+    container.scrollTop +=
+      container.scrollHeight - scrollHeightBeforeLoad.current;
+    scrollHeightBeforeLoad.current = null;
+  }, [firstMessageId]);
+
+  useLayoutEffect(() => {
+    if (!lastMessageId) return;
+
+    messagesEndRef.current?.scrollIntoView({
+      behavior: previousLastMessageId.current ? "smooth" : "auto",
+    });
+    previousLastMessageId.current = lastMessageId;
+  }, [lastMessageId]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [lastMessageId]);
+    const container = messagesRef.current;
+    const top = messagesTopRef.current;
+    if (!container || !top || !hasNextPage || isFetchingNextPage) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+
+        scrollHeightBeforeLoad.current = container.scrollHeight;
+        fetchNextPage();
+      },
+      { root: container },
+    );
+
+    observer.observe(top);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   useEffect(() => {
     if (pendingLeave.current?.roomId === roomId) {
@@ -250,17 +292,29 @@ export default function Chat() {
           onOpenSettings={openSettings}
         />
 
-        <Messages>
-          <DayTag>Hoje</DayTag>
-          {messages.map((message) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              mine={message.owner.id === currentUserId}
-              onEdit={openEditMessage}
-              onDelete={({ id }) => remove.mutate(id)}
-            />
-          ))}
+        <Messages ref={messagesRef}>
+          <div ref={messagesTopRef} />
+          {isFetchingNextPage && <DayTag>Carregando...</DayTag>}
+          {messages.map((message, index) => {
+            const previous = messages[index - 1];
+            const isNewDay =
+              !previous ||
+              getDayKey(previous.createdAt) !== getDayKey(message.createdAt);
+
+            return (
+              <Fragment key={message.id}>
+                {isNewDay && (
+                  <DayTag>{formatDayLabel(message.createdAt)}</DayTag>
+                )}
+                <MessageBubble
+                  message={message}
+                  mine={message.owner.id === currentUserId}
+                  onEdit={openEditMessage}
+                  onDelete={({ id }) => remove.mutate(id)}
+                />
+              </Fragment>
+            );
+          })}
           <div ref={messagesEndRef} />
         </Messages>
 
