@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { createServer } from "@services/express";
 import http from "http";
 import { AddressInfo } from "net";
+import { websockets } from "@services/websockets";
 
 const host = process.env.HOST || "0.0.0.0";
 const port = process.env.PORT || 8800;
@@ -17,6 +18,10 @@ async function startServer() {
     throw new Error("JWT_SECRET não definida no .env");
   }
 
+  if (!process.env.CLIENT_URL) {
+    throw new Error("CLIENT_URL não definida no .env");
+  }
+
   await mongoose.connect(MONGO_URI);
 
   const app = createServer();
@@ -28,6 +33,8 @@ async function startServer() {
       `Server ready at http://${addressInfo.address}:${addressInfo.port}`,
     );
   });
+
+  websockets(server);
 
   return app;
 }

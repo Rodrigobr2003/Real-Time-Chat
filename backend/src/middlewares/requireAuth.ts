@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { TOKEN_COOKIE, verifyToken } from "@utils/jwt";
+import { TOKEN_COOKIE, verifyTokenPayload } from "@utils/jwt";
 
 export const requireAuth = (
   req: Request,
@@ -13,7 +13,7 @@ export const requireAuth = (
   }
 
   try {
-    req.userId = verifyToken(token);
+    req.userId = verifyTokenPayload(token).userId;
     next();
   } catch {
     return res.status(401).json({ message: "Sessão inválida ou expirada" });
