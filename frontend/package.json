@@ -19,6 +19,7 @@
     "react-dom": "^19.2.8",
     "react-hook-form": "^7.88.0",
     "react-router-dom": "^7.18.4",
+    "react-use-websocket": "^4.13.0",
     "styled-components": "^6.5.3",
     "zod": "^4.6.5",
     "zustand": "^5.0.15"
