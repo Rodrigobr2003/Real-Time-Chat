@@ -33,6 +33,7 @@ import type {
   MessageTargetInput,
   PublicMessage,
 } from "@typings/message";
+import { IRealtimePublisher } from "./RealtimeHub";
 
 const MAX_PUNISHMENT_DURATION_MS = PUNISHMENT_DURATIONS_MS.at(-1)!;
 
@@ -49,6 +50,7 @@ export class ChatService {
     private readonly chatRepository: IChatRepository,
     private readonly punishmentRepository: IPunishmentRepository,
     private readonly messageRespository: IMessageRepository,
+    private readonly realtime: IRealtimePublisher,
   ) {}
 
   private async assertIsAdmin(input: ChatDefaultInput) {
@@ -291,7 +293,11 @@ export class ChatService {
 
     await this.isUserConnected(input);
 
-    return this.messageRespository.create(input);
+    const message = await this.messageRespository.create(input);
+
+    this.realtime.publish(input.chatId, { type: "message:created", message });
+
+    return message;
   }
 
   async editMessage(input: MessageEditInput): Promise<PublicMessage | null> {
@@ -301,7 +307,15 @@ export class ChatService {
 
     if (!(await this.assertCanChangeMessage(input))) return null;
 
-    return this.messageRespository.update(input);
+    const message = await this.messageRespository.update(input);
+
+    if (!message) {
+      throw new Error("Mensagem inexistente");
+    }
+
+    this.realtime.publish(input.chatId, { type: "message:updated", message });
+
+    return message;
   }
 
   async deleteMessage(
@@ -313,6 +327,14 @@ export class ChatService {
 
     if (!(await this.assertCanChangeMessage(input))) return null;
 
-    return this.messageRespository.delete(input);
+    const message = await this.messageRespository.delete(input);
+
+    if (!message) {
+      throw new Error("Mensagem inexistente");
+    }
+
+    this.realtime.publish(input.chatId, { type: "message:deleted", message });
+
+    return message;
   }
 }

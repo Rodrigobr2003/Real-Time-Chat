@@ -2,8 +2,15 @@ import type { IncomingMessage, Server } from "http";
 import type { Duplex } from "stream";
 import { WebSocketServer } from "ws";
 import { parse } from "cookie";
-import { TOKEN_COOKIE, verifyTokenPayload, type TokenSession } from "@utils/jwt";
+import {
+  TOKEN_COOKIE,
+  verifyTokenPayload,
+  type TokenSession,
+} from "@utils/jwt";
 import type { AuthenticatedSocket } from "@typings/auth";
+import { ServerEvent } from "@typings/realtime";
+import { clientEventSchema } from "@validations/realtime";
+import { realtimeHub } from "./RealtimeHub";
 
 const WS_PATH = "/ws";
 
@@ -52,6 +59,41 @@ export const websockets = (server: Server) => {
   wss.on(
     "connection",
     (ws: AuthenticatedSocket, _req: IncomingMessage, session: TokenSession) => {
+      const sendEvent = (event: ServerEvent) => ws.send(JSON.stringify(event));
+
+      ws.on("message", async (raw) => {
+        let data: unknown;
+
+        try {
+          data = JSON.parse(raw.toString());
+        } catch (error) {
+          return sendEvent({ type: "error", message: "Evento inválido" });
+        }
+
+        const parsed = clientEventSchema.safeParse(data);
+
+        if (!parsed.success) {
+          return sendEvent({ type: "error", message: "Evento inválido" });
+        }
+
+        const event = parsed.data;
+
+        if (event.type === "room:join") {
+          const joined = await realtimeHub.join(ws, event.chatId);
+
+          if (!joined) {
+            sendEvent({
+              type: "error",
+              message: "Você não está conectado a esta sala",
+            });
+          }
+        }
+
+        if (event.type === "room:leave") {
+          realtimeHub.leave(ws, event.chatId);
+        }
+      });
+
       ws.userId = session.userId;
       console.log(`Usuário ${ws.userId} conectado`);
 
@@ -62,8 +104,10 @@ export const websockets = (server: Server) => {
 
       ws.on("close", () => {
         clearTimeout(expireTimer);
+        realtimeHub.leaveAll(ws);
         console.log(`Usuário ${ws.userId} desconectou`);
       });
+
       ws.on("error", (err) => console.error(err));
     },
   );

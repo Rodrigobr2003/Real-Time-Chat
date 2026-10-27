@@ -6,6 +6,7 @@ import { MongoChatRepository } from "@repositories/ChatRepository";
 import { MongoPunishmentRepository } from "@repositories/PunishmentRepository";
 import { ChatService } from "@services/ChatService";
 import { MessageRepository } from "@repositories/MessageRepository";
+import { realtimeHub } from "@services/RealtimeHub";
 
 const repository = new MongoChatRepository();
 const punishmentRepository = new MongoPunishmentRepository();
@@ -15,6 +16,7 @@ const service = new ChatService(
   repository,
   punishmentRepository,
   messageRepository,
+  realtimeHub,
 );
 
 const controller = new ChatController(service);
