@@ -12,6 +12,7 @@ import {
 } from "../api/messageHelpers";
 import { CHATS_QUERY_KEY } from "../context/chatListContextInstance";
 import { MESSAGES_PAGE_SIZE, type IMessage } from "../model/messageModel";
+import { useChatRealtime } from "./useChatRealtime";
 
 export const useMessages = (chatId: string, enabled: boolean) => {
   const queryClient = useQueryClient();
@@ -48,6 +49,16 @@ export const useMessages = (chatId: string, enabled: boolean) => {
         return { ...current, pages };
       },
     );
+
+  useChatRealtime(chatId, enabled, (event) => {
+    if (
+      event.type === "message:created" ||
+      event.type === "message:updated" ||
+      event.type === "message:deleted"
+    ) {
+      upsert(event.message);
+    }
+  });
 
   const send = useMutation({
     mutationFn: (content: string) => sendMessage(chatId, content),
