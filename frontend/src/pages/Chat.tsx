@@ -60,6 +60,8 @@ const Messages = styled.section`
   padding: 20px 16px;
 `;
 
+const ScrollAnchor = styled.div``;
+
 const DayTag = styled.span`
   align-self: center;
   margin-block: 8px;
@@ -103,6 +105,8 @@ export default function Chat() {
   const {
     messages,
     send,
+    retrySend,
+    discard,
     edit,
     remove,
     fetchNextPage,
@@ -229,7 +233,8 @@ export default function Chat() {
     const content = text.trim();
     if (!content) return;
 
-    send.mutate(content, { onSuccess: () => setText("") });
+    send(content);
+    setText("");
   }
 
   function openEditMessage(message: IMessage) {
@@ -293,7 +298,7 @@ export default function Chat() {
         />
 
         <Messages ref={messagesRef}>
-          <div ref={messagesTopRef} />
+          <ScrollAnchor ref={messagesTopRef} />
           {isFetchingNextPage && <DayTag>Carregando...</DayTag>}
           {messages.map((message, index) => {
             const previous = messages[index - 1];
@@ -302,7 +307,7 @@ export default function Chat() {
               getDayKey(previous.createdAt) !== getDayKey(message.createdAt);
 
             return (
-              <Fragment key={message.id}>
+              <Fragment key={message.clientMessageId ?? message.id}>
                 {isNewDay && (
                   <DayTag>{formatDayLabel(message.createdAt)}</DayTag>
                 )}
@@ -311,18 +316,20 @@ export default function Chat() {
                   mine={message.owner.id === currentUserId}
                   onEdit={openEditMessage}
                   onDelete={({ id }) => remove.mutate(id)}
+                  onRetry={retrySend}
+                  onDiscard={discard}
                 />
               </Fragment>
             );
           })}
-          <div ref={messagesEndRef} />
+          <ScrollAnchor ref={messagesEndRef} />
         </Messages>
 
         <MessageInput
           value={text}
           onChange={setText}
           onSend={handleSend}
-          disabled={!isConnected || send.isPending}
+          disabled={!isConnected}
         />
       </Container>
 

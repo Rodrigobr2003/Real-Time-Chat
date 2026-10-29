@@ -9,6 +9,8 @@ export interface IMessageOwner {
   profileBgColor: string;
 }
 
+export type MessageStatus = "sent" | "pending" | "failed";
+
 export interface IMessage {
   id: string;
   chatId: string;
@@ -18,4 +20,8 @@ export interface IMessage {
   editedAt: string | null;
   deletedAt: string | null;
   createdAt: string;
+}
+
+export interface IChatMessage extends IMessage {
+  status: MessageStatus;
 }

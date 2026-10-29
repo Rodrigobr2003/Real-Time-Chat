@@ -15,8 +15,15 @@ export const listMessages = async (
   return data;
 };
 
-export const sendMessage = async (chatId: string, content: string) => {
-  const { data } = await api.post<IMessage>(messagesPath(chatId), { content });
+export const sendMessage = async (
+  chatId: string,
+  content: string,
+  clientMessageId: string,
+) => {
+  const { data } = await api.post<IMessage>(messagesPath(chatId), {
+    content,
+    clientMessageId,
+  });
 
   return data;
 };

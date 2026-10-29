@@ -1,14 +1,27 @@
-import { Ban, ChevronDown, Pencil, Trash2 } from "lucide-react";
+import {
+  AlertCircle,
+  Ban,
+  ChevronDown,
+  Clock,
+  Pencil,
+  RotateCw,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
-import type { IMessage } from "../../model/messageModel";
+import type { IChatMessage } from "../../model/messageModel";
 import { Avatar } from "../ui/Avatar";
 
+type MessageAction = (message: IChatMessage) => void;
+
 type MessageBubbleProps = {
-  message: IMessage;
+  message: IChatMessage;
   mine: boolean;
-  onEdit: (message: IMessage) => void;
-  onDelete: (message: IMessage) => void;
+  onEdit: MessageAction;
+  onDelete: MessageAction;
+  onRetry: MessageAction;
+  onDiscard: MessageAction;
 };
 
 const Row = styled.div<{ $mine: boolean }>`
@@ -78,6 +91,8 @@ const Menu = styled.ul`
   white-space: nowrap;
 `;
 
+const MenuEntry = styled.li``;
+
 const MenuItem = styled.button<{ $danger?: boolean }>`
   display: flex;
   align-items: center;
@@ -115,6 +130,18 @@ const Deleted = styled.span`
   opacity: 0.75;
 `;
 
+const FailedNotice = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: ${({ theme }) => theme.colors.danger};
+  font-weight: 600;
+`;
+
+const EditedLabel = styled.span``;
+
+const Time = styled.time``;
+
 const Meta = styled.div`
   display: flex;
   justify-content: flex-end;
@@ -135,11 +162,15 @@ export function MessageBubble({
   mine,
   onEdit,
   onDelete,
+  onRetry,
+  onDiscard,
 }: MessageBubbleProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const bubbleRef = useRef<HTMLDivElement>(null);
   const isDeleted = !!message.deletedAt;
-  const canManage = mine && !isDeleted;
+  const isFailed = message.status === "failed";
+  const canManage =
+    mine && !isDeleted && (message.status === "sent" || isFailed);
 
   useEffect(() => {
     if (!isMenuOpen) return;
@@ -154,7 +185,7 @@ export function MessageBubble({
     return () => document.removeEventListener("mousedown", close);
   }, [isMenuOpen]);
 
-  function handleAction(action: (message: IMessage) => void) {
+  function handleAction(action: MessageAction) {
     setIsMenuOpen(false);
     action(message);
   }
@@ -183,22 +214,51 @@ export function MessageBubble({
             </MenuTrigger>
             {isMenuOpen && (
               <Menu role="menu">
-                <li>
-                  <MenuItem type="button" onClick={() => handleAction(onEdit)}>
-                    <Pencil size={14} />
-                    Editar
-                  </MenuItem>
-                </li>
-                <li>
-                  <MenuItem
-                    type="button"
-                    $danger
-                    onClick={() => handleAction(onDelete)}
-                  >
-                    <Trash2 size={14} />
-                    Apagar
-                  </MenuItem>
-                </li>
+                {isFailed ? (
+                  <>
+                    <MenuEntry>
+                      <MenuItem
+                        type="button"
+                        onClick={() => handleAction(onRetry)}
+                      >
+                        <RotateCw size={14} />
+                        Tentar de novo
+                      </MenuItem>
+                    </MenuEntry>
+                    <MenuEntry>
+                      <MenuItem
+                        type="button"
+                        $danger
+                        onClick={() => handleAction(onDiscard)}
+                      >
+                        <X size={14} />
+                        Descartar
+                      </MenuItem>
+                    </MenuEntry>
+                  </>
+                ) : (
+                  <>
+                    <MenuEntry>
+                      <MenuItem
+                        type="button"
+                        onClick={() => handleAction(onEdit)}
+                      >
+                        <Pencil size={14} />
+                        Editar
+                      </MenuItem>
+                    </MenuEntry>
+                    <MenuEntry>
+                      <MenuItem
+                        type="button"
+                        $danger
+                        onClick={() => handleAction(onDelete)}
+                      >
+                        <Trash2 size={14} />
+                        Apagar
+                      </MenuItem>
+                    </MenuEntry>
+                  </>
+                )}
               </Menu>
             )}
           </>
@@ -213,10 +273,19 @@ export function MessageBubble({
           message.content
         )}
         <Meta>
-          {message.editedAt && !isDeleted && <span>Editada</span>}
-          <time dateTime={message.createdAt}>
+          {isFailed && (
+            <FailedNotice>
+              <AlertCircle size={12} />
+              Não enviada
+            </FailedNotice>
+          )}
+          {message.editedAt && !isDeleted && <EditedLabel>Editada</EditedLabel>}
+          <Time dateTime={message.createdAt}>
             {formatTime(message.createdAt)}
-          </time>
+          </Time>
+          {message.status === "pending" && (
+            <Clock size={12} aria-label="Enviando" />
+          )}
         </Meta>
       </Bubble>
     </Row>

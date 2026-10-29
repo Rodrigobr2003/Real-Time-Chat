@@ -23,7 +23,7 @@ export const messageBodySchema = z.object({
 });
 
 export const sendMessageBodySchema = messageBodySchema.extend({
-  clientMessageId: z.uuid("Identificador da mensagem inválido").optional(),
+  clientMessageId: z.uuid("Identificador da mensagem inválido"),
 });
 
 export const messageParamsSchema = z.object({
