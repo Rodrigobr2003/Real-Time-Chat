@@ -50,15 +50,20 @@ export const useMessages = (chatId: string, enabled: boolean) => {
       },
     );
 
-  useChatRealtime(chatId, enabled, (event) => {
-    if (
-      event.type === "message:created" ||
-      event.type === "message:updated" ||
-      event.type === "message:deleted"
-    ) {
-      upsert(event.message);
-    }
-  });
+  useChatRealtime(
+    chatId,
+    enabled,
+    (event) => {
+      if (
+        event.type === "message:created" ||
+        event.type === "message:updated" ||
+        event.type === "message:deleted"
+      ) {
+        upsert(event.message);
+      }
+    },
+    () => queryClient.invalidateQueries({ queryKey }),
+  );
 
   const send = useMutation({
     mutationFn: (content: string) => sendMessage(chatId, content),

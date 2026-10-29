@@ -12,6 +12,19 @@ let refreshPromise: Promise<void> | null = null;
 
 type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
+export const refreshSessionOnce = async () => {
+  try {
+    refreshPromise ??= refreshSession().finally(() => {
+      refreshPromise = null;
+    });
+
+    await refreshPromise;
+  } catch (refreshError) {
+    window.dispatchEvent(new Event("auth:session-expired"));
+    throw refreshError;
+  }
+};
+
 export const setupAuthInterceptor = () => {
   api.interceptors.response.use(
     (response) => response,
@@ -29,13 +42,8 @@ export const setupAuthInterceptor = () => {
       original._retry = true;
 
       try {
-        refreshPromise ??= refreshSession().finally(() => {
-          refreshPromise = null;
-        });
-
-        await refreshPromise;
+        await refreshSessionOnce();
       } catch (refreshError) {
-        window.dispatchEvent(new Event("auth:session-expired"));
         return Promise.reject(refreshError);
       }
 
