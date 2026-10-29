@@ -14,6 +14,7 @@ export interface IMessage {
   chatId: string;
   owner: IMessageOwner;
   content: string;
+  clientMessageId: string | null;
   editedAt: string | null;
   deletedAt: string | null;
   createdAt: string;

@@ -64,6 +64,7 @@ export const toPublicMessage = (doc: MessageDoc): PublicMessage => ({
     profileBgColor: doc.owner.profileBgColor ?? USER_BACKGROUND_COLOR[0],
   },
   content: doc.deletedAt ? "" : doc.content,
+  clientMessageId: doc.clientMessageId ?? null,
   editedAt: doc.editedAt ?? null,
   deletedAt: doc.deletedAt ?? null,
   createdAt: doc.createdAt,

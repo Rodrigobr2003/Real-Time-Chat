@@ -27,6 +27,7 @@ import type {
 import { compressPhoto } from "@utils/image";
 import type { IMessageRepository } from "@repositories/MessageRepository";
 import type {
+  CreateMessageResult,
   ListMessagesInput,
   MessageDefaultInput,
   MessageEditInput,
@@ -288,16 +289,23 @@ export class ChatService {
     return this.messageRespository.list(input);
   }
 
-  async sendMessage(input: MessageDefaultInput): Promise<PublicMessage | null> {
+  async sendMessage(
+    input: MessageDefaultInput,
+  ): Promise<CreateMessageResult | null> {
     if (!(await this.chatRepository.exists(input.chatId))) return null;
 
     await this.isUserConnected(input);
 
-    const message = await this.messageRespository.create(input);
+    const result = await this.messageRespository.create(input);
 
-    this.realtime.publish(input.chatId, { type: "message:created", message });
+    if (result.created) {
+      this.realtime.publish(input.chatId, {
+        type: "message:created",
+        message: result.message,
+      });
+    }
 
-    return message;
+    return result;
   }
 
   async editMessage(input: MessageEditInput): Promise<PublicMessage | null> {

@@ -17,6 +17,7 @@ import {
   listMessagesSchema,
   messageBodySchema,
   messageParamsSchema,
+  sendMessageBodySchema,
 } from "@validations/message";
 
 const handleMessageError = (err: unknown, res: Response) => {
@@ -428,7 +429,7 @@ export class ChatController {
     const params = chatParamsSchema
       .pick({ chatId: true })
       .safeParse(req.params);
-    const body = messageBodySchema.safeParse(req.body ?? {});
+    const body = sendMessageBodySchema.safeParse(req.body ?? {});
 
     if (!params.success) {
       return res
@@ -443,17 +444,17 @@ export class ChatController {
     }
 
     try {
-      const message = await this.chatService.sendMessage({
+      const result = await this.chatService.sendMessage({
+        ...body.data,
         userId: req.userId!,
         chatId: params.data.chatId,
-        content: body.data.content,
       });
 
-      if (!message) {
+      if (!result) {
         return res.status(404).json({ message: "Sala não encontrada" });
       }
 
-      return res.status(201).json(message);
+      return res.status(result.created ? 201 : 200).json(result.message);
     } catch (err) {
       return handleMessageError(err, res);
     }

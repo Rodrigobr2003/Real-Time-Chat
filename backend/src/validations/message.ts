@@ -22,6 +22,10 @@ export const messageBodySchema = z.object({
   content: messageSchema,
 });
 
+export const sendMessageBodySchema = messageBodySchema.extend({
+  clientMessageId: z.uuid("Identificador da mensagem inválido").optional(),
+});
+
 export const messageParamsSchema = z.object({
   chatId: z.uuid("Sala inválida"),
   messageId: z.string().regex(/^[0-9a-f]{24}$/i, "Mensagem inválida"),

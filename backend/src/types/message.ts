@@ -2,6 +2,12 @@ import type { ChatDefaultInput, ConnectedUserDoc } from "./chat";
 
 export interface MessageDefaultInput extends ChatDefaultInput {
   content: string;
+  clientMessageId?: string;
+}
+
+export interface CreateMessageResult {
+  message: PublicMessage;
+  created: boolean;
 }
 
 export interface MessageTargetInput extends ChatDefaultInput {
@@ -24,6 +30,7 @@ export type MessageDoc = {
   chatId: string;
   owner: MessageOwnerDoc;
   content: string;
+  clientMessageId?: string | null;
   editedAt?: Date | null;
   deletedAt?: Date | null;
   createdAt: Date;
@@ -42,6 +49,7 @@ export interface PublicMessage {
   chatId: string;
   owner: MessageOwner;
   content: string;
+  clientMessageId: string | null;
   editedAt: Date | null;
   deletedAt: Date | null;
   createdAt: Date;

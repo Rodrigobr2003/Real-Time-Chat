@@ -21,6 +21,11 @@ const ChatMessagesSchema = new Schema(
       maxLength: MESSAGE_MAX_LENGTH,
       minLength: MESSAGE_MIN_LENGTH,
     },
+    clientMessageId: {
+      type: String,
+      default: null,
+      immutable: true,
+    },
     editedAt: {
       type: Date,
       default: null,
@@ -36,6 +41,13 @@ const ChatMessagesSchema = new Schema(
 );
 
 ChatMessagesSchema.index({ chatId: 1, createdAt: -1 });
+ChatMessagesSchema.index(
+  { owner: 1, clientMessageId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { clientMessageId: { $type: "string" } },
+  },
+);
 
 export type IChatMessages = InferSchemaType<typeof ChatMessagesSchema>;
 
