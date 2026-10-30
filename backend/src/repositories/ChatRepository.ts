@@ -2,7 +2,7 @@ import { verify } from "@node-rs/argon2";
 import { Types } from "mongoose";
 import { ConflictError } from "@errors/ConflictError";
 import { ForbiddenError } from "@errors/ForbiddenError";
-import { ChatModel } from "@models/chatSchema";
+import { ChatModel, type ChatPrivacy } from "@models/chatSchema";
 import type {
   ChatConnectionInput,
   ChatDefaultInput,
@@ -50,6 +50,7 @@ export interface IChatRepository {
   connect(input: ChatConnectionInput): Promise<boolean>;
   delete(chatId: string): Promise<boolean>;
   exists(chatId: string): Promise<boolean>;
+  findPrivacy(chatId: string): Promise<ChatPrivacy | null>;
   disconnect(input: ChatDefaultInput): Promise<boolean>;
   listConnectedUsers(chatId: string): Promise<ConnectedUser[] | null>;
   verifyAdmin(input: ChatDefaultInput): Promise<boolean>;
@@ -75,6 +76,14 @@ export class MongoChatRepository implements IChatRepository {
 
   async exists(chatId: string) {
     return !!(await ChatModel.exists({ chatId, deletedAt: null }));
+  }
+
+  async findPrivacy(chatId: string) {
+    const chat = await ChatModel.findOne({ chatId, deletedAt: null })
+      .select("privacy")
+      .lean();
+
+    return chat?.privacy ?? null;
   }
 
   async update(data: UpdateChatInput) {

@@ -7,10 +7,12 @@ import { ServerEvent } from "@typings/realtime";
 
 export interface IRealtimePublisher {
   publish(chatId: string, event: ServerEvent): void;
+  publishToList(event: ServerEvent): void;
 }
 
 export class RealtimeHub implements IRealtimePublisher {
   private readonly rooms = new Map<string, Set<AuthenticatedSocket>>();
+  private readonly listSubscribers = new Set<AuthenticatedSocket>();
 
   constructor(private readonly chatRepository: IChatRepository) {}
 
@@ -40,6 +42,7 @@ export class RealtimeHub implements IRealtimePublisher {
 
   leaveAll(socket: AuthenticatedSocket) {
     for (const chatId of this.rooms.keys()) this.leave(socket, chatId);
+    this.unsubscribeList(socket);
   }
 
   publish(chatId: string, event: ServerEvent) {
@@ -50,6 +53,22 @@ export class RealtimeHub implements IRealtimePublisher {
     const data = JSON.stringify(event);
 
     for (const socket of room) {
+      if (socket.readyState === socket.OPEN) socket.send(data);
+    }
+  }
+
+  subscribeList(socket: AuthenticatedSocket) {
+    this.listSubscribers.add(socket);
+  }
+
+  unsubscribeList(socket: AuthenticatedSocket) {
+    this.listSubscribers.delete(socket);
+  }
+
+  publishToList(event: ServerEvent) {
+    const data = JSON.stringify(event);
+
+    for (const socket of this.listSubscribers) {
       if (socket.readyState === socket.OPEN) socket.send(data);
     }
   }

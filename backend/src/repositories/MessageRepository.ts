@@ -28,6 +28,7 @@ export interface IMessageRepository {
   update(input: MessageEditInput): Promise<PublicMessage | null>;
   delete(input: MessageTargetInput): Promise<PublicMessage | null>;
   list(input: ListMessagesInput): Promise<PublicMessage[]>;
+  findLatestByChats(chatIds: string[]): Promise<PublicMessage[]>;
 }
 
 export class MessageRepository implements IMessageRepository {
@@ -115,5 +116,23 @@ export class MessageRepository implements IMessageRepository {
       .lean<MessageDoc[]>();
 
     return docs.reverse().map(toPublicMessage);
+  }
+
+  async findLatestByChats(chatIds: string[]) {
+    if (chatIds.length === 0) return [];
+
+    const latest = await ChatMessageModel.aggregate([
+      { $match: { chatId: { $in: chatIds }, deletedAt: null } },
+      { $sort: { chatId: 1, createdAt: -1 } },
+      { $group: { _id: "$chatId", doc: { $first: "$$ROOT" } } },
+      { $replaceRoot: { newRoot: "$doc" } },
+    ]);
+
+    const docs = await ChatMessageModel.populate<MessageDoc>(latest, {
+      path: "owner",
+      select: OWNER_FIELDS,
+    });
+
+    return docs.map(toPublicMessage);
   }
 }

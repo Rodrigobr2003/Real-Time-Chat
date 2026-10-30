@@ -1,5 +1,6 @@
 import type { ChatPrivacy } from "@models/chatSchema";
 import type { Status } from "@models/userSchema";
+import type { PublicMessage } from "./message";
 
 export type ChatDoc = {
   _id: { toString(): string };
@@ -68,6 +69,7 @@ export interface PublicChat {
   chatPhotoURL: string | null;
   usersCount: number;
   createdAt: Date;
+  lastMessage?: PublicMessage | null;
 }
 
 export interface ChatList {

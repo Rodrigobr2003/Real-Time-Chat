@@ -92,6 +92,14 @@ export const websockets = (server: Server) => {
         if (event.type === "room:leave") {
           realtimeHub.leave(ws, event.chatId);
         }
+
+        if (event.type === "rooms:subscribe") {
+          realtimeHub.subscribeList(ws);
+        }
+
+        if (event.type === "rooms:unsubscribe") {
+          realtimeHub.unsubscribeList(ws);
+        }
       });
 
       ws.userId = session.userId;

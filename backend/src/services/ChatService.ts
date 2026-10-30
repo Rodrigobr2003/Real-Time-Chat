@@ -125,7 +125,26 @@ export class ChatService {
   }
 
   async listChats(input: ListChatsInput): Promise<ChatList> {
-    return this.chatRepository.list(input);
+    const list = await this.chatRepository.list(input);
+
+    // Última mensagem só das salas públicas; as privadas não expõem conteúdo
+    const publicChatIds = list.chats
+      .filter(({ privacy }) => privacy === "public")
+      .map(({ chatId }) => chatId);
+
+    const latest =
+      await this.messageRespository.findLatestByChats(publicChatIds);
+    const latestByChat = new Map(
+      latest.map((message) => [message.chatId, message]),
+    );
+
+    return {
+      ...list,
+      chats: list.chats.map((chat) => ({
+        ...chat,
+        lastMessage: latestByChat.get(chat.chatId) ?? null,
+      })),
+    };
   }
 
   async listConnectedUsers(chatId: string): Promise<ModeratedUser[] | null> {
@@ -292,7 +311,9 @@ export class ChatService {
   async sendMessage(
     input: MessageDefaultInput,
   ): Promise<CreateMessageResult | null> {
-    if (!(await this.chatRepository.exists(input.chatId))) return null;
+    const privacy = await this.chatRepository.findPrivacy(input.chatId);
+
+    if (!privacy) return null;
 
     await this.isUserConnected(input);
 
@@ -303,6 +324,14 @@ export class ChatService {
         type: "message:created",
         message: result.message,
       });
+
+      if (privacy === "public") {
+        this.realtime.publishToList({
+          type: "room:lastMessage",
+          chatId: input.chatId,
+          message: result.message,
+        });
+      }
     }
 
     return result;
