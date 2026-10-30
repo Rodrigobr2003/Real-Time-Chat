@@ -1,6 +1,7 @@
 import { formatDistanceToNowStrict } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Lock, LockOpen, Users } from "lucide-react";
+import type { MouseEvent } from "react";
 import styled from "styled-components";
 import type { IPublicChat } from "../../model/chatModel";
 import { Avatar } from "../ui/Avatar";
@@ -34,8 +35,23 @@ const Info = styled.div`
   flex: 1;
   min-width: 0;
 
+  p {
+    min-height: 1lh;
+    font-size: 13px;
+    color: ${({ theme }) => theme.colors.textMuted};
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+`;
+
+const NameRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
   strong {
-    display: block;
+    min-width: 0;
     font-size: 15px;
     white-space: nowrap;
     overflow: hidden;
@@ -43,11 +59,10 @@ const Info = styled.div`
   }
 `;
 
-const Privacy = styled.p<{ $private: boolean }>`
+const Privacy = styled.span<{ $private: boolean }>`
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 13px;
   color: ${({ $private, theme }) =>
     $private ? theme.colors.danger : theme.colors.success};
 `;
@@ -70,8 +85,15 @@ const Capacity = styled.span<{ $full: boolean }>`
   border-radius: ${({ theme }) => theme.radius.full};
   background: ${({ $full, theme }) =>
     $full ? "rgba(231, 76, 60, 0.12)" : theme.colors.surfaceAlt};
-  color: ${({ $full, theme }) => ($full ? theme.colors.danger : theme.colors.textMuted)};
+  color: ${({ $full, theme }) =>
+    $full ? theme.colors.danger : theme.colors.textMuted};
 `;
+
+const showTitleIfTruncated = (event: MouseEvent<HTMLElement>) => {
+  const el = event.currentTarget;
+  if (el.scrollWidth > el.clientWidth) el.title = el.textContent ?? "";
+  else el.removeAttribute("title");
+};
 
 const formatCreatedAt = (createdAt: string) =>
   formatDistanceToNowStrict(new Date(createdAt), {
@@ -91,18 +113,37 @@ export function RoomItem({ room, onClick }: RoomItemProps) {
         color={room.chatBgColor}
         size={42}
       />
+
       <Info>
-        <strong>{room.name}</strong>
-        <Privacy $private={isPrivate}>
-          {isPrivate ? <Lock size={12} /> : <LockOpen size={12} />}
-          {isPrivate ? "Sala privada" : "Sala pública"}
-        </Privacy>
+        <NameRow>
+          <strong onMouseEnter={showTitleIfTruncated}>{room.name}</strong>
+          <Privacy
+            $private={isPrivate}
+            title={isPrivate ? "Sala privada" : "Sala pública"}
+            aria-label={isPrivate ? "Sala privada" : "Sala pública"}
+          >
+            {isPrivate ? <Lock size={14} /> : <LockOpen size={14} />}
+          </Privacy>
+        </NameRow>
+
+        <p onMouseEnter={showTitleIfTruncated}>
+          {room.lastMessage && (
+            <>
+              <b>{room.lastMessage.owner.name}:</b> {room.lastMessage.content}
+            </>
+          )}
+        </p>
       </Info>
+
       <Meta>
         <time dateTime={room.createdAt} title="Criada">
           {formatCreatedAt(room.createdAt)}
         </time>
-        <Capacity $full={isFull} title={isFull ? "Sala cheia" : "Pessoas na sala"}>
+
+        <Capacity
+          $full={isFull}
+          title={isFull ? "Sala cheia" : "Pessoas na sala"}
+        >
           <Users size={12} />
           {isFull ? "Cheia" : `${room.usersCount}/${room.userLimit}`}
         </Capacity>

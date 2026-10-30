@@ -1,3 +1,4 @@
+import type { IMessage } from "./messageModel";
 import type { UserStatus } from "./userModel";
 
 export const CHAT_PRIVACY = ["public", "private"] as const;
@@ -82,6 +83,7 @@ export interface IPublicChat {
   chatPhotoURL: string | null;
   usersCount: number;
   createdAt: string;
+  lastMessage?: IMessage | null;
 }
 
 export interface IListChatsParams {

@@ -1,11 +1,18 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useQueryClient,
+  type InfiniteData,
+} from "@tanstack/react-query";
 import { listChats } from "../api/chatHelpers";
 import { useAuth } from "../hooks/useAuth";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
+import { useRealtimeSocket } from "../hooks/useRealtimeSocket";
 import {
   INITIAL_CHAT_FILTERS,
   type IChatFilters,
+  type IChatList,
   type IListChatsParams,
   type PeopleFilter,
 } from "../model/chatModel";
@@ -45,6 +52,7 @@ const toListQuery = (
 
 export const ChatListProvider = ({ children }: IChatListProvider) => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [filters, setFilters] = useState<IChatFilters>(INITIAL_CHAT_FILTERS);
   const [isChatsPolling, setChatsPolling] = useState(false);
 
@@ -87,6 +95,32 @@ export const ChatListProvider = ({ children }: IChatListProvider) => {
     enabled: !!user,
     refetchInterval: isChatsPolling ? POLLING_INTERVAL_MS : false,
   });
+
+  useRealtimeSocket(
+    { type: "rooms:subscribe" },
+    !!user,
+    (event) => {
+      if (event.type !== "room:lastMessage") return;
+
+      queryClient.setQueriesData<InfiniteData<IChatList>>(
+        { queryKey: [...CHATS_QUERY_KEY, "list"] },
+        (current) =>
+          current && {
+            ...current,
+            pages: current.pages.map((page) => ({
+              ...page,
+              chats: page.chats.map((chat) =>
+                chat.chatId === event.chatId
+                  ? { ...chat, lastMessage: event.message }
+                  : chat,
+              ),
+            })),
+          },
+      );
+    },
+    () =>
+      queryClient.invalidateQueries({ queryKey: [...CHATS_QUERY_KEY, "list"] }),
+  );
 
   const chats = useMemo(
     () => data?.pages.flatMap((page) => page.chats) ?? [],
