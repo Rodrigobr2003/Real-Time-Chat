@@ -26,8 +26,30 @@ const Header = styled.header`
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
+  padding-top: max(12px, env(safe-area-inset-top));
   background: ${({ theme }) => theme.colors.surface};
   border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    gap: 8px;
+    padding-inline: 6px 4px;
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-bottom: 8px;
+  }
+`;
+
+const Summary = styled.div<{ $clickable: boolean }>`
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: ${({ theme }) => theme.radius.md};
+  cursor: ${({ $clickable }) => ($clickable ? "pointer" : "default")};
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    gap: 10px;
+  }
 `;
 
 const Info = styled.div`
@@ -39,20 +61,49 @@ const Info = styled.div`
     align-items: center;
     gap: 6px;
     font-size: 15px;
+
+    > svg {
+      flex-shrink: 0;
+    }
   }
+`;
+
+const RoomName = styled.span`
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `;
 
 const Details = styled.div`
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   font-size: 12px;
+  white-space: nowrap;
   color: ${({ theme }) => theme.colors.textMuted};
 
   span {
     display: flex;
     align-items: center;
     gap: 4px;
+  }
+`;
+
+const RoomId = styled.span`
+  min-width: 0;
+  overflow: hidden;
+
+  && {
+    display: block;
+    text-overflow: ellipsis;
+  }
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    && {
+      display: none;
+    }
   }
 `;
 
@@ -109,33 +160,54 @@ export function ChatHeader({
       <IconButton onClick={onBack} aria-label="Voltar">
         <ArrowLeft size={20} />
       </IconButton>
-      {photoURL ? (
-        <PhotoButton
-          type="button"
-          onClick={() => setIsPhotoOpen(true)}
-          aria-label="Ver foto da sala"
-        >
-          {avatar}
-        </PhotoButton>
-      ) : (
-        avatar
-      )}
-      <Info>
-        <strong>
-          {roomName}
-          {isPrivate ? <Lock size={14} /> : <LockOpen size={14} />}
-        </strong>
-        <Details>
-          <Online>online</Online>·
-          <ConnectedUsersTooltip users={connectedUsers} isLoading={isLoadingUsers}>
-            <span>
-              <Users size={12} />
-              {members}/{maxMembers} pessoas
-            </span>
-          </ConnectedUsersTooltip>
-          · sala {roomId}
-        </Details>
-      </Info>
+      <Summary
+        $clickable={!!onOpenSettings}
+        onClick={onOpenSettings}
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) return;
+          if (event.key !== "Enter" && event.key !== " ") return;
+
+          event.preventDefault();
+          onOpenSettings?.();
+        }}
+        role={onOpenSettings ? "button" : undefined}
+        tabIndex={onOpenSettings ? 0 : undefined}
+        aria-label={onOpenSettings ? "Abrir informações da sala" : undefined}
+      >
+        {photoURL ? (
+          <PhotoButton
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              setIsPhotoOpen(true);
+            }}
+            aria-label="Ver foto da sala"
+          >
+            {avatar}
+          </PhotoButton>
+        ) : (
+          avatar
+        )}
+        <Info>
+          <strong>
+            <RoomName title={roomName}>{roomName}</RoomName>
+            {isPrivate ? <Lock size={14} /> : <LockOpen size={14} />}
+          </strong>
+          <Details>
+            <Online>online</Online>·
+            <ConnectedUsersTooltip
+              users={connectedUsers}
+              isLoading={isLoadingUsers}
+            >
+              <span>
+                <Users size={12} />
+                {members}/{maxMembers} pessoas
+              </span>
+            </ConnectedUsersTooltip>
+            <RoomId title={roomId}>· sala {roomId}</RoomId>
+          </Details>
+        </Info>
+      </Summary>
       {onOpenSettings && (
         <IconButton aria-label="Mais opções" onClick={onOpenSettings}>
           <MoreVertical size={20} />
@@ -143,7 +215,11 @@ export function ChatHeader({
       )}
 
       {photoURL && (
-        <Modal title={roomName} open={isPhotoOpen} onClose={() => setIsPhotoOpen(false)}>
+        <Modal
+          title={roomName}
+          open={isPhotoOpen}
+          onClose={() => setIsPhotoOpen(false)}
+        >
           <FullPhoto src={photoURL} alt={`Foto da sala ${roomName}`} />
         </Modal>
       )}

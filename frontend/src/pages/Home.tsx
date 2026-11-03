@@ -13,10 +13,37 @@ import { mockProfile, type Profile } from "../mocks/profile";
 
 type HomeTab = "rooms" | "profile";
 
+const HomePage = styled(CenteredPage)`
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    padding: 0;
+  }
+`;
+
 const HomeCard = styled(Card)`
   max-width: 480px;
   height: min(720px, calc(100dvh - 48px));
   gap: 20px;
+
+  @media (min-width: ${({ theme }) => theme.breakpoints.tablet}) {
+    max-width: 520px;
+    height: min(780px, calc(100dvh - 64px));
+  }
+
+  @media (min-width: ${({ theme }) => theme.breakpoints.desktop}) {
+    max-width: 560px;
+    height: min(860px, calc(100dvh - 96px));
+  }
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    max-width: none;
+    height: 100dvh;
+    gap: 16px;
+    padding: max(16px, env(safe-area-inset-top)) 16px
+      max(16px, env(safe-area-inset-bottom));
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
 `;
 
 const toProfile = (user: IPublicUser | null): Profile =>
@@ -56,7 +83,7 @@ export default function Home() {
   }
 
   return (
-    <CenteredPage>
+    <HomePage>
       <HomeCard>
         <Tabs role="tablist">
           <Tab
@@ -89,6 +116,6 @@ export default function Home() {
           />
         )}
       </HomeCard>
-    </CenteredPage>
+    </HomePage>
   );
 }

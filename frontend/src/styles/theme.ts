@@ -23,6 +23,8 @@ export const theme = {
   shadow: "0 10px 30px rgba(0, 0, 0, 0.35)",
   breakpoints: {
     mobile: "640px",
+    tablet: "1024px",
+    desktop: "1440px",
   },
 } as const;
 

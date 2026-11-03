@@ -49,6 +49,10 @@ const MenuTrigger = styled.button<{ $open: boolean }>`
   &:focus-visible {
     opacity: 1;
   }
+
+  @media (hover: none) {
+    opacity: ${({ $open }) => ($open ? 1 : 0.7)};
+  }
 `;
 
 const Bubble = styled.div<{ $mine: boolean }>`
@@ -68,6 +72,10 @@ const Bubble = styled.div<{ $mine: boolean }>`
 
   &:hover ${MenuTrigger} {
     opacity: 1;
+  }
+
+  @media (min-width: ${({ theme }) => theme.breakpoints.desktop}) {
+    max-width: min(60%, 640px);
   }
 
   @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {

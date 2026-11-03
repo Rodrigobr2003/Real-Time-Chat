@@ -5,7 +5,8 @@ export const CenteredPage = styled.main`
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px 16px;
+  padding: max(24px, env(safe-area-inset-top)) 16px
+    max(24px, env(safe-area-inset-bottom));
   background: radial-gradient(
     circle at top,
     rgba(108, 92, 231, 0.18),
@@ -26,7 +27,8 @@ export const Card = styled.section`
   box-shadow: ${({ theme }) => theme.shadow};
 
   @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
-    padding: 24px;
+    gap: 20px;
+    padding: 24px 20px;
   }
 `;
 

@@ -37,6 +37,7 @@ type ChatLocationState =
 
 const Page = styled.main`
   height: 100%;
+  height: 100dvh;
   display: flex;
   justify-content: center;
   background: ${({ theme }) => theme.colors.background};
@@ -49,6 +50,15 @@ const Container = styled.div`
   display: flex;
   flex-direction: column;
   border-inline: 1px solid ${({ theme }) => theme.colors.border};
+
+  @media (min-width: ${({ theme }) => theme.breakpoints.desktop}) {
+    max-width: 1080px;
+  }
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.tablet}) {
+    max-width: none;
+    border-inline: none;
+  }
 `;
 
 const Messages = styled.section`
@@ -58,6 +68,16 @@ const Messages = styled.section`
   flex-direction: column;
   gap: 8px;
   padding: 20px 16px;
+  overscroll-behavior: contain;
+
+  @media (min-width: ${({ theme }) => theme.breakpoints.desktop}) {
+    padding: 24px 32px;
+  }
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    gap: 6px;
+    padding: 12px 10px;
+  }
 `;
 
 const ScrollAnchor = styled.div``;

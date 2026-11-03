@@ -87,6 +87,14 @@ const Segmented = styled.div`
   border-radius: ${({ theme }) => theme.radius.full};
   background: ${({ theme }) => theme.colors.surfaceAlt};
   border: 1px solid ${({ theme }) => theme.colors.border};
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    flex: 1 1 100%;
+
+    > button {
+      flex: 1;
+    }
+  }
 `;
 
 const Segment = styled.button<{ $active: boolean }>`
@@ -102,6 +110,10 @@ const Segment = styled.button<{ $active: boolean }>`
 
   &:hover {
     color: ${({ $active, theme }) => ($active ? "#fff" : theme.colors.text)};
+  }
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    padding-block: 7px;
   }
 `;
 
