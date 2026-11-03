@@ -8,6 +8,8 @@ import type {
   ChatDefaultInput,
   ChatList,
   ChatListFilters,
+  ChatDemoteAdminInput,
+  ChatPromoteAdminInput,
   ConnectedUser,
   ConnectedUserDoc,
   ListChatsInput,
@@ -56,6 +58,8 @@ export interface IChatRepository {
   verifyAdmin(input: ChatDefaultInput): Promise<boolean>;
   verifyOwner(input: ChatDefaultInput): Promise<boolean>;
   verifyConnectionStatus(input: ChatDefaultInput): Promise<boolean>;
+  promoteToAdmin(input: ChatPromoteAdminInput): Promise<boolean>;
+  demoteAdmin(input: ChatDemoteAdminInput): Promise<boolean>;
 }
 
 export class MongoChatRepository implements IChatRepository {
@@ -146,7 +150,7 @@ export class MongoChatRepository implements IChatRepository {
 
   async listConnectedUsers(chatId: string) {
     const doc = await ChatModel.findOne({ chatId, deletedAt: null })
-      .select("usersConnected")
+      .select("usersConnected chatAdmins chatOwner")
       .populate<{ usersConnected: ConnectedUserDoc[] }>({
         path: "usersConnected",
         select: "name user userPhoto status profileBgColor",
@@ -156,7 +160,13 @@ export class MongoChatRepository implements IChatRepository {
 
     if (!doc) return null;
 
-    return doc.usersConnected.map(toConnectedUser);
+    const adminIds = new Set(doc.chatAdmins.map((id) => id.toString()));
+
+    return doc.usersConnected.map((user) => ({
+      ...toConnectedUser(user),
+      isAdmin: adminIds.has(user._id.toString()),
+      isOwner: doc.chatOwner.toString() === user._id.toString(),
+    }));
   }
 
   async connect(input: ChatConnectionInput) {
@@ -247,5 +257,32 @@ export class MongoChatRepository implements IChatRepository {
     });
 
     return !!isConnected;
+  }
+
+  async promoteToAdmin(input: ChatPromoteAdminInput) {
+    const { chatId, userIdToPromote } = input;
+
+    const objectId = new Types.ObjectId(userIdToPromote);
+
+    const { matchedCount } = await ChatModel.updateOne(
+      { chatId, deletedAt: null, usersConnected: objectId },
+      { $addToSet: { chatAdmins: objectId } },
+    );
+
+    return matchedCount > 0;
+  }
+
+  async demoteAdmin(input: ChatDemoteAdminInput) {
+    const { chatId, userIdToDemote } = input;
+
+    const objectId = new Types.ObjectId(userIdToDemote);
+
+    // O criador da sala nunca deixa de ser admin
+    const { matchedCount } = await ChatModel.updateOne(
+      { chatId, deletedAt: null, chatOwner: { $ne: objectId } },
+      { $pull: { chatAdmins: objectId } },
+    );
+
+    return matchedCount > 0;
   }
 }

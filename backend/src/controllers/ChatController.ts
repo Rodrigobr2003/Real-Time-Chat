@@ -517,4 +517,60 @@ export class ChatController {
       return handleMessageError(err, res);
     }
   };
+
+  promoteToAdmin = async (req: Request, res: Response) => {
+    try {
+      const target = parseTargetUser(req, res);
+
+      if (!target) return;
+
+      const promoted = await this.chatService.promoteToAdmin({
+        userId: req.userId!,
+        chatId: target.chatId,
+        userIdToPromote: target.userId,
+      });
+
+      if (!promoted) {
+        return res.status(404).json({ message: "Sala não encontrada" });
+      }
+
+      return res
+        .status(200)
+        .json({ message: "Usuário promovido a administrador" });
+    } catch (error) {
+      if (error instanceof ForbiddenError) {
+        return res.status(403).json({ message: error.message });
+      }
+
+      return res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  };
+
+  demoteAdmin = async (req: Request, res: Response) => {
+    try {
+      const target = parseTargetUser(req, res);
+
+      if (!target) return;
+
+      const demoted = await this.chatService.demoteAdmin({
+        userId: req.userId!,
+        chatId: target.chatId,
+        userIdToDemote: target.userId,
+      });
+
+      if (!demoted) {
+        return res.status(404).json({ message: "Sala não encontrada" });
+      }
+
+      return res
+        .status(200)
+        .json({ message: "Usuário removido da administração" });
+    } catch (error) {
+      if (error instanceof ForbiddenError) {
+        return res.status(403).json({ message: error.message });
+      }
+
+      return res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  };
 }

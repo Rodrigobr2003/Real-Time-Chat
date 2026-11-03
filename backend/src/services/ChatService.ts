@@ -17,6 +17,8 @@ import type {
   UpdateChatInput,
   ChatConnectionInput,
   ChatConnectionResult,
+  ChatDemoteAdminInput,
+  ChatPromoteAdminInput,
 } from "@typings/chat";
 import type {
   ChatPunishmentDoc,
@@ -373,5 +375,30 @@ export class ChatService {
     this.realtime.publish(input.chatId, { type: "message:deleted", message });
 
     return message;
+  }
+
+  async promoteToAdmin(input: ChatPromoteAdminInput): Promise<boolean> {
+    await this.isUserConnected(input);
+    await this.assertIsAdmin(input);
+
+    return this.chatRepository.promoteToAdmin(input);
+  }
+
+  async demoteAdmin(input: ChatDemoteAdminInput): Promise<boolean> {
+    await this.isUserConnected(input);
+    await this.assertIsAdmin(input);
+
+    const isTargetOwner = await this.chatRepository.verifyOwner({
+      userId: input.userIdToDemote,
+      chatId: input.chatId,
+    });
+
+    if (isTargetOwner) {
+      throw new ForbiddenError(
+        "O criador da sala não pode deixar de ser administrador",
+      );
+    }
+
+    return this.chatRepository.demoteAdmin(input);
   }
 }

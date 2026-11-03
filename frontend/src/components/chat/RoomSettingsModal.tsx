@@ -11,6 +11,7 @@ import {
   Pencil,
   Plus,
   ShieldCheck,
+  ShieldMinus,
   ShieldPlus,
   Trash2,
   UserCheck,
@@ -478,7 +479,9 @@ export function RoomSettingsModal({
     null,
   );
   const currentUserId = useAuth().user?.id;
-  const [adminUserIds, setAdminUserIds] = useState<string[]>([]);
+  const [adminUserIds, setAdminUserIds] = useState<string[]>(() =>
+    connectedUsers.filter((user) => user.isAdmin).map((user) => user.id),
+  );
   const [openMenu, setOpenMenu] = useState<{
     user: IConnectedUser;
     top: number;
@@ -491,7 +494,10 @@ export function RoomSettingsModal({
   const isPrivate = privacy === "private";
   const needsPassword = isPrivate && settings.privacy !== "private";
   const photoURL = photoPreview ?? settings.chatPhotoURL;
-  const visibleUsers = connectedUsers;
+  // Admins primeiro; usa o valor salvo para a lista não pular ao promover alguém
+  const visibleUsers = [...connectedUsers].sort(
+    (a, b) => Number(!!b.isAdmin) - Number(!!a.isAdmin),
+  );
   const blockedUsers = blockedUsersQuery.data ?? [];
   const punishCount = userToPunish?.punishedCount ?? 0;
   const minLimit = Math.max(CHAT_MIN_USERS, visibleUsers.length);
@@ -747,7 +753,10 @@ export function RoomSettingsModal({
                       {user.name}
                       {user.id === currentUserId && " (você)"}
                       {adminUserIds.includes(user.id) && (
-                        <AdminBadge title="Administrador">
+                        <AdminBadge
+                          title={`${user.name} é um administrador do grupo`}
+                          aria-label={`${user.name} é um administrador do grupo`}
+                        >
                           <ShieldCheck size={14} />
                         </AdminBadge>
                       )}
@@ -985,18 +994,28 @@ export function RoomSettingsModal({
         <>
           <MenuBackdrop onClick={() => setOpenMenu(null)} />
           <ActionsMenu role="menu" $top={openMenu.top} $right={openMenu.right}>
-            <li>
-              <MenuItem
-                type="button"
-                role="menuitem"
-                onClick={() => runMenuAction(toggleAdmin)}
-              >
-                <ShieldPlus size={16} />
-                {adminUserIds.includes(openMenu.user.id)
-                  ? "Remover administrador"
-                  : "Adicionar como administrador"}
-              </MenuItem>
-            </li>
+            {/* O criador da sala é sempre admin: não há o que alternar */}
+            {!openMenu.user.isOwner && (
+              <li>
+                <MenuItem
+                  type="button"
+                  role="menuitem"
+                  onClick={() => runMenuAction(toggleAdmin)}
+                >
+                  {adminUserIds.includes(openMenu.user.id) ? (
+                    <>
+                      <ShieldMinus size={16} />
+                      Remover administrador
+                    </>
+                  ) : (
+                    <>
+                      <ShieldPlus size={16} />
+                      Adicionar como administrador
+                    </>
+                  )}
+                </MenuItem>
+              </li>
+            )}
             <li>
               <MenuItem
                 type="button"

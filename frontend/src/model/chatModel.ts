@@ -63,6 +63,8 @@ export interface IConnectedUser {
   status: UserStatus;
   profileBgColor: string;
   punishedCount?: number;
+  isAdmin?: boolean;
+  isOwner?: boolean;
 }
 
 export type PunishmentType = "temporary" | "blocked";

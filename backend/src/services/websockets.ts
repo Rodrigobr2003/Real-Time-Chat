@@ -102,9 +102,6 @@ export const websockets = (server: Server) => {
         }
       });
 
-      ws.userId = session.userId;
-      console.log(`Usuário ${ws.userId} conectado`);
-
       const expireTimer = setTimeout(
         () => ws.close(4001, "Sessão expirada"),
         session.expiresAt - Date.now(),
@@ -113,7 +110,6 @@ export const websockets = (server: Server) => {
       ws.on("close", () => {
         clearTimeout(expireTimer);
         realtimeHub.leaveAll(ws);
-        console.log(`Usuário ${ws.userId} desconectou`);
       });
 
       ws.on("error", (err) => console.error(err));

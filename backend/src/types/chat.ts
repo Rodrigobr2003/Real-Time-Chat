@@ -59,6 +59,14 @@ export interface ChatConnectionResult {
   isOwner: boolean;
 }
 
+export interface ChatPromoteAdminInput extends ChatDefaultInput {
+  userIdToPromote: string;
+}
+
+export interface ChatDemoteAdminInput extends ChatDefaultInput {
+  userIdToDemote: string;
+}
+
 export interface PublicChat {
   id: string;
   chatId: string;
@@ -93,4 +101,6 @@ export interface ConnectedUser {
   userPhotoURL: string | null;
   status: Status;
   profileBgColor: string;
+  isAdmin?: boolean;
+  isOwner?: boolean;
 }

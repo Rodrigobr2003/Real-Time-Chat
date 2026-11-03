@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   kickUser,
+  demoteUser,
   listBlockedUsers,
+  promoteUser,
   punishUser,
   unblockUser,
 } from "../api/chatHelpers";
@@ -36,5 +38,15 @@ export const useRoomModeration = (chatId: string, enabled = true) => {
     onSuccess,
   });
 
-  return { blockedUsersQuery, kick, punish, unblock };
+  const promote = useMutation({
+    mutationFn: (userId: string) => promoteUser(chatId, userId),
+    onSuccess,
+  });
+
+  const demote = useMutation({
+    mutationFn: (userId: string) => demoteUser(chatId, userId),
+    onSuccess,
+  });
+
+  return { blockedUsersQuery, kick, punish, unblock, promote, demote };
 };

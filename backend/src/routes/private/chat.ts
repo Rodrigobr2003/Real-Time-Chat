@@ -39,6 +39,16 @@ router.get("/:chatId/blocked-users", requireAuth, controller.listBlockedUsers);
 router.patch("/:chatId/users/:userId/kick", requireAuth, controller.kick);
 router.patch("/:chatId/users/:userId/punish", requireAuth, controller.punish);
 router.patch("/:chatId/users/:userId/unblock", requireAuth, controller.unblock);
+router.patch(
+  "/:chatId/users/:userId/promote",
+  requireAuth,
+  controller.promoteToAdmin,
+);
+router.patch(
+  "/:chatId/users/:userId/demote",
+  requireAuth,
+  controller.demoteAdmin,
+);
 
 router.get("/:chatId/messages", requireAuth, controller.listMessages);
 router.post("/:chatId/messages", requireAuth, controller.sendMessage);

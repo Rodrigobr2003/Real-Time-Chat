@@ -122,6 +122,14 @@ export const unblockUser = async (chatId: string, userId: string) => {
   await api.patch(`${chatUserPath(chatId, userId)}/unblock`);
 };
 
+export const promoteUser = async (chatId: string, userId: string) => {
+  await api.patch(`${chatUserPath(chatId, userId)}/promote`);
+};
+
+export const demoteUser = async (chatId: string, userId: string) => {
+  await api.patch(`${chatUserPath(chatId, userId)}/demote`);
+};
+
 export const listConnectedUsers = async (chatId: string) => {
   const { data } = await api.get<IConnectedUser[]>(
     `${PRIVATE_CHAT_DEFAULT_PATH}/${chatId}/connected-users`,

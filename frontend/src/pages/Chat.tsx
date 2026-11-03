@@ -21,6 +21,7 @@ import { CHATS_QUERY_KEY } from "../context/chatListContextInstance";
 import { useAuth } from "../hooks/useAuth";
 import { useConnectedUsers } from "../hooks/useConnectedUsers";
 import { useMessages } from "../hooks/useMessages";
+import { useRoomModeration } from "../hooks/useRoomModeration";
 import {
   CHAT_BG_COLORS,
   type IChatConnection,
@@ -113,6 +114,8 @@ export default function Chat() {
   }));
   const { data: connectedUsers = [], isPending: isLoadingUsers } =
     useConnectedUsers(roomId);
+  const { promote, demote } = useRoomModeration(roomId, false);
+  const adminError = promote.error ?? demote.error;
   const queryClient = useQueryClient();
   const pendingLeave = useRef<{ roomId: string; timer: number } | null>(null);
   const currentUserId = useAuth().user?.id;
@@ -274,6 +277,8 @@ export default function Chat() {
   function openSettings() {
     resetSaveChat();
     resetDeleteChat();
+    promote.reset();
+    demote.reset();
     setIsSettingsOpen(true);
   }
 
@@ -293,9 +298,32 @@ export default function Chat() {
 
     const finish = () => setIsSettingsOpen(false);
 
-    if (Object.keys(dto).length === 0) return finish();
+    const currentAdminIds = connectedUsers
+      .filter((user) => user.isAdmin)
+      .map((user) => user.id);
+    const promotedIds = changes.adminUserIds.filter(
+      (id) => !currentAdminIds.includes(id),
+    );
+    const demotedIds = currentAdminIds.filter(
+      (id) => !changes.adminUserIds.includes(id),
+    );
 
-    saveChat(dto, { onSuccess: finish });
+    const saveAdmins = () => {
+      if (promotedIds.length === 0 && demotedIds.length === 0) return finish();
+
+      promote.reset();
+      demote.reset();
+      Promise.all([
+        ...promotedIds.map((id) => promote.mutateAsync(id)),
+        ...demotedIds.map((id) => demote.mutateAsync(id)),
+      ])
+        .then(finish)
+        .catch(() => {});
+    };
+
+    if (Object.keys(dto).length === 0) return saveAdmins();
+
+    saveChat(dto, { onSuccess: saveAdmins });
   }
 
   return (
@@ -371,8 +399,11 @@ export default function Chat() {
           connectedUsers={connectedUsers}
           onClose={() => setIsSettingsOpen(false)}
           onSave={handleSaveSettings}
-          isSaving={isSavingChat}
-          saveError={saveChatError && getApiErrors(saveChatError)}
+          isSaving={isSavingChat || promote.isPending || demote.isPending}
+          saveError={
+            (saveChatError || adminError) &&
+            getApiErrors(saveChatError ?? adminError)
+          }
           onDelete={isOwner ? () => removeChat(roomId) : undefined}
           isDeleting={isDeletingChat}
           deleteError={deleteChatError && getApiErrors(deleteChatError).message}
