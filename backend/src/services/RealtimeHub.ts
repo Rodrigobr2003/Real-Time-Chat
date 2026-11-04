@@ -8,6 +8,8 @@ import { ServerEvent } from "@typings/realtime";
 export interface IRealtimePublisher {
   publish(chatId: string, event: ServerEvent): void;
   publishToList(event: ServerEvent): void;
+  removeUser(chatId: string, userId: string): void;
+  closeRoom(chatId: string): void;
 }
 
 export class RealtimeHub implements IRealtimePublisher {
@@ -55,6 +57,20 @@ export class RealtimeHub implements IRealtimePublisher {
     for (const socket of room) {
       if (socket.readyState === socket.OPEN) socket.send(data);
     }
+  }
+
+  removeUser(chatId: string, userId: string) {
+    const room = this.rooms.get(chatId);
+
+    if (!room) return;
+
+    for (const socket of room) {
+      if (socket.userId === userId) this.leave(socket, chatId);
+    }
+  }
+
+  closeRoom(chatId: string) {
+    this.rooms.delete(chatId);
   }
 
   subscribeList(socket: AuthenticatedSocket) {

@@ -59,6 +59,8 @@ export const websockets = (server: Server) => {
   wss.on(
     "connection",
     (ws: AuthenticatedSocket, _req: IncomingMessage, session: TokenSession) => {
+      ws.userId = session.userId;
+
       const sendEvent = (event: ServerEvent) => ws.send(JSON.stringify(event));
 
       ws.on("message", async (raw) => {

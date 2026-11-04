@@ -53,6 +53,7 @@ export interface IChatRepository {
   delete(chatId: string): Promise<boolean>;
   exists(chatId: string): Promise<boolean>;
   findPrivacy(chatId: string): Promise<ChatPrivacy | null>;
+  findPublic(chatId: string): Promise<PublicChat | null>;
   disconnect(input: ChatDefaultInput): Promise<boolean>;
   listConnectedUsers(chatId: string): Promise<ConnectedUser[] | null>;
   verifyAdmin(input: ChatDefaultInput): Promise<boolean>;
@@ -88,6 +89,12 @@ export class MongoChatRepository implements IChatRepository {
       .lean();
 
     return chat?.privacy ?? null;
+  }
+
+  async findPublic(chatId: string) {
+    const doc = await ChatModel.findOne({ chatId, deletedAt: null }).lean();
+
+    return doc && toPublicChat(doc);
   }
 
   async update(data: UpdateChatInput) {

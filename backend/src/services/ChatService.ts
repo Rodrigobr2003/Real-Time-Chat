@@ -36,6 +36,7 @@ import type {
   MessageTargetInput,
   PublicMessage,
 } from "@typings/message";
+import type { RoomChange } from "@typings/realtime";
 import { IRealtimePublisher } from "./RealtimeHub";
 
 const MAX_PUNISHMENT_DURATION_MS = PUNISHMENT_DURATIONS_MS.at(-1)!;
@@ -47,6 +48,35 @@ const isActiveTemporary = (punishment: ChatPunishmentDoc | null) =>
 
 const minutesUntil = (date: Date) =>
   Math.max(1, Math.ceil((date.getTime() - Date.now()) / 60_000));
+
+const diffChat = (
+  previous: PublicChat,
+  updated: PublicChat,
+  input: UpdateChatInput,
+): RoomChange[] => [
+  ...(updated.name !== previous.name
+    ? [{ field: "name", from: previous.name, to: updated.name } as const]
+    : []),
+  ...(updated.privacy !== previous.privacy
+    ? [{ field: "privacy", to: updated.privacy } as const]
+    : []),
+  ...(updated.userLimit !== previous.userLimit
+    ? [
+        {
+          field: "userLimit",
+          from: previous.userLimit,
+          to: updated.userLimit,
+        } as const,
+      ]
+    : []),
+  ...(input.chatPhoto ? [{ field: "photo" } as const] : []),
+  ...(updated.chatBgColor !== previous.chatBgColor
+    ? [{ field: "color" } as const]
+    : []),
+  ...(input.password && previous.privacy === "private"
+    ? [{ field: "password" } as const]
+    : []),
+];
 
 export class ChatService {
   constructor(
@@ -66,6 +96,13 @@ export class ChatService {
     if (!(await this.chatRepository.verifyOwner(input))) {
       throw new ForbiddenError("Apenas o dono da sala pode fazer isso");
     }
+  }
+
+  private async findConnectedTarget(input: ChatDefaultInput) {
+    const users = await this.chatRepository.listConnectedUsers(input.chatId);
+    const name = users?.find((user) => user.id === input.userId)?.name;
+
+    return { id: input.userId, name: name ?? null };
   }
 
   private async isUserConnected(input: ChatDefaultInput) {
@@ -111,19 +148,48 @@ export class ChatService {
       });
     }
 
-    return this.chatRepository.update({
+    const previous = await this.chatRepository.findPublic(chatId);
+
+    const updated = await this.chatRepository.update({
       ...input,
       ...(input.chatPhoto && {
         chatPhoto: await compressPhoto(input.chatPhoto),
       }),
     });
+
+    if (updated && previous) {
+      const changes = diffChat(previous, updated, input);
+
+      if (changes.length > 0) {
+        this.realtime.publish(chatId, {
+          type: "room:updated",
+          chatId,
+          chat: updated,
+          changes,
+          actorId: userId,
+        });
+      }
+    }
+
+    return updated;
   }
 
   async delete(input: ChatDefaultInput): Promise<boolean> {
     await this.isUserConnected(input);
     await this.assertIsOwner(input);
 
-    return this.chatRepository.delete(input.chatId);
+    const deleted = await this.chatRepository.delete(input.chatId);
+
+    if (deleted) {
+      this.realtime.publish(input.chatId, {
+        type: "room:deleted",
+        chatId: input.chatId,
+        actorId: input.userId,
+      });
+      this.realtime.closeRoom(input.chatId);
+    }
+
+    return deleted;
   }
 
   async listChats(input: ListChatsInput): Promise<ChatList> {
@@ -210,11 +276,20 @@ export class ChatService {
     await this.isUserConnected({ userId, chatId: input.chatId });
     await this.assertIsAdmin({ userId, chatId: input.chatId });
 
+    const target = await this.findConnectedTarget(input);
     const disconnected = await this.chatRepository.disconnect(input);
 
     if (!disconnected) {
       throw new ConflictError("O usuário não está conectado nesta sala");
     }
+
+    this.realtime.publish(input.chatId, {
+      type: "room:remove",
+      chatId: input.chatId,
+      actorId: userId,
+      target,
+    });
+    this.realtime.removeUser(input.chatId, input.userId);
 
     return true;
   }
@@ -257,6 +332,8 @@ export class ChatService {
         ? new Date(Date.now() + next.durationMs)
         : null;
 
+    const target = await this.findConnectedTarget(input);
+
     const punishment = await this.punishmentRepository.apply({
       chatId: input.chatId,
       userId: input.userId,
@@ -265,6 +342,25 @@ export class ChatService {
     });
 
     await this.chatRepository.disconnect(input);
+
+    this.realtime.publish(
+      input.chatId,
+      punishment.type === "blocked"
+        ? {
+            type: "room:permanent-ban",
+            chatId: input.chatId,
+            actorId: userId,
+            target,
+          }
+        : {
+            type: "room:temporary-ban",
+            chatId: input.chatId,
+            actorId: userId,
+            target,
+            expiresAt: punishment.expiresAt ?? null,
+          },
+    );
+    this.realtime.removeUser(input.chatId, input.userId);
 
     return {
       type: punishment.type,
@@ -281,7 +377,21 @@ export class ChatService {
 
     if (current?.type !== "blocked") return false;
 
-    return this.punishmentRepository.reset(input);
+    const blocked = await this.punishmentRepository.listBlocked(input.chatId);
+    const name = blocked.find((user) => user.id === input.userId)?.name;
+
+    const unblocked = await this.punishmentRepository.reset(input);
+
+    if (unblocked) {
+      this.realtime.publish(input.chatId, {
+        type: "room:remove-ban",
+        chatId: input.chatId,
+        actorId: userId,
+        target: { id: input.userId, name: name ?? null },
+      });
+    }
+
+    return unblocked;
   }
 
   private async assertCanChangeMessage(input: MessageTargetInput) {
@@ -381,7 +491,23 @@ export class ChatService {
     await this.isUserConnected(input);
     await this.assertIsAdmin(input);
 
-    return this.chatRepository.promoteToAdmin(input);
+    const wasAdmin = await this.chatRepository.verifyAdmin({
+      userId: input.userIdToPromote,
+      chatId: input.chatId,
+    });
+
+    const promoted = await this.chatRepository.promoteToAdmin(input);
+
+    if (promoted && !wasAdmin) {
+      this.realtime.publish(input.chatId, {
+        type: "room:promote-admin",
+        chatId: input.chatId,
+        actorId: input.userId,
+        userIdToPromote: input.userIdToPromote,
+      });
+    }
+
+    return promoted;
   }
 
   async demoteAdmin(input: ChatDemoteAdminInput): Promise<boolean> {
@@ -399,6 +525,22 @@ export class ChatService {
       );
     }
 
-    return this.chatRepository.demoteAdmin(input);
+    const wasAdmin = await this.chatRepository.verifyAdmin({
+      userId: input.userIdToDemote,
+      chatId: input.chatId,
+    });
+
+    const demoted = await this.chatRepository.demoteAdmin(input);
+
+    if (demoted && wasAdmin) {
+      this.realtime.publish(input.chatId, {
+        type: "room:demote-admin",
+        chatId: input.chatId,
+        actorId: input.userId,
+        userIdToDemote: input.userIdToDemote,
+      });
+    }
+
+    return demoted;
   }
 }
