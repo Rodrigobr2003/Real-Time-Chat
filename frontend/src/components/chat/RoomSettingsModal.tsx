@@ -59,7 +59,6 @@ export type RoomSettings = {
 export type RoomSettingsChanges = RoomSettings & {
   chatPhoto: File | null;
   password: string;
-  adminUserIds: string[];
 };
 
 type RoomSettingsModalProps = {
@@ -470,7 +469,7 @@ export function RoomSettingsModal({
   const [password, setPassword] = useState("");
   const [chatPhoto, setChatPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const { blockedUsersQuery, kick, punish, unblock } =
+  const { blockedUsersQuery, kick, punish, unblock, promote, demote } =
     useRoomModeration(chatId, canEdit);
   const [moderationError, setModerationError] = useState("");
   const [userToPunish, setUserToPunish] = useState<IConnectedUser | null>(null);
@@ -586,11 +585,18 @@ export function RoomSettingsModal({
   }
 
   function toggleAdmin(user: IConnectedUser) {
-    setAdminUserIds((current) =>
-      current.includes(user.id)
-        ? current.filter((id) => id !== user.id)
-        : [...current, user.id],
-    );
+    const isAdmin = adminUserIds.includes(user.id);
+
+    setModerationError("");
+    (isAdmin ? demote : promote).mutate(user.id, {
+      onSuccess: () =>
+        setAdminUserIds((current) =>
+          isAdmin
+            ? current.filter((id) => id !== user.id)
+            : [...current, user.id],
+        ),
+      onError: onModerationError,
+    });
   }
 
   function confirmUnblock() {
@@ -616,7 +622,6 @@ export function RoomSettingsModal({
       chatPhotoURL: photoURL,
       chatPhoto,
       password: isPrivate ? password : "",
-      adminUserIds,
     });
   }
 
@@ -832,46 +837,46 @@ export function RoomSettingsModal({
             </span>
           </div>
           {canEdit ? (
-          <Stepper>
-            <StepButton
-              type="button"
-              aria-label="Diminuir limite"
-              disabled={userLimit <= minLimit}
-              onClick={() => changeLimit(userLimit - 1)}
-            >
-              <Minus size={16} />
-            </StepButton>
-            <input
-              type="number"
-              inputMode="numeric"
-              aria-label="Limite de pessoas"
-              min={minLimit}
-              max={CHAT_MAX_USERS}
-              value={limitText}
-              onChange={(event) => {
-                const text = event.target.value.replace(/D/g, "").slice(0, 2);
-                setLimitText(text);
-                const value = Number(text);
-                if (value >= minLimit && value <= CHAT_MAX_USERS)
-                  setUserLimit(value);
-              }}
-              onBlur={() => changeLimit(Number(limitText))}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  changeLimit(Number(limitText));
-                }
-              }}
-            />
-            <StepButton
-              type="button"
-              aria-label="Aumentar limite"
-              disabled={userLimit >= CHAT_MAX_USERS}
-              onClick={() => changeLimit(userLimit + 1)}
-            >
-              <Plus size={16} />
-            </StepButton>
-          </Stepper>
+            <Stepper>
+              <StepButton
+                type="button"
+                aria-label="Diminuir limite"
+                disabled={userLimit <= minLimit}
+                onClick={() => changeLimit(userLimit - 1)}
+              >
+                <Minus size={16} />
+              </StepButton>
+              <input
+                type="number"
+                inputMode="numeric"
+                aria-label="Limite de pessoas"
+                min={minLimit}
+                max={CHAT_MAX_USERS}
+                value={limitText}
+                onChange={(event) => {
+                  const text = event.target.value.replace(/D/g, "").slice(0, 2);
+                  setLimitText(text);
+                  const value = Number(text);
+                  if (value >= minLimit && value <= CHAT_MAX_USERS)
+                    setUserLimit(value);
+                }}
+                onBlur={() => changeLimit(Number(limitText))}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    changeLimit(Number(limitText));
+                  }
+                }}
+              />
+              <StepButton
+                type="button"
+                aria-label="Aumentar limite"
+                disabled={userLimit >= CHAT_MAX_USERS}
+                onClick={() => changeLimit(userLimit + 1)}
+              >
+                <Plus size={16} />
+              </StepButton>
+            </Stepper>
           ) : (
             <strong>{userLimit}</strong>
           )}

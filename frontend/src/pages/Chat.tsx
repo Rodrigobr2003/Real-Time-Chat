@@ -12,6 +12,7 @@ import { ChatHeader } from "../components/chat/ChatHeader";
 import { EditMessageModal } from "../components/chat/EditMessageModal";
 import { MessageBubble } from "../components/chat/MessageBubble";
 import { MessageInput } from "../components/chat/MessageInput";
+import { SystemMessage } from "../components/chat/SystemMessage";
 import {
   RoomSettingsModal,
   type RoomSettings,
@@ -21,7 +22,6 @@ import { CHATS_QUERY_KEY } from "../context/chatListContextInstance";
 import { useAuth } from "../hooks/useAuth";
 import { useConnectedUsers } from "../hooks/useConnectedUsers";
 import { useMessages } from "../hooks/useMessages";
-import { useRoomModeration } from "../hooks/useRoomModeration";
 import {
   CHAT_BG_COLORS,
   type IChatConnection,
@@ -29,6 +29,11 @@ import {
   type IUpdateChatDTO,
 } from "../model/chatModel";
 import type { IMessage } from "../model/messageModel";
+import type { ServerEvent } from "../model/realtimeModel";
+import type {
+  ISystemMessage,
+  SystemEvent,
+} from "../model/systemMessageModel";
 import { getApiErrors } from "../utils/apiErrors";
 import { formatDayLabel, getDayKey } from "../utils/messageDate";
 
@@ -114,8 +119,6 @@ export default function Chat() {
   }));
   const { data: connectedUsers = [], isPending: isLoadingUsers } =
     useConnectedUsers(roomId);
-  const { promote, demote } = useRoomModeration(roomId, false);
-  const adminError = promote.error ?? demote.error;
   const queryClient = useQueryClient();
   const pendingLeave = useRef<{ roomId: string; timer: number } | null>(null);
   const currentUserId = useAuth().user?.id;
@@ -135,7 +138,135 @@ export default function Chat() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useMessages(roomId, isConnected);
+  } = useMessages(roomId, isConnected, handleRoomEvent);
+  const [roomNotices, setRoomNotices] = useState<ISystemMessage[]>([]);
+
+  // Avisos que chegam pelo socket enquanto a sala está aberta (ex.: edição)
+  function handleRoomEvent(event: ServerEvent) {
+    // O servidor manda só ids; o nome vem da lista de conectados
+    const toActor = (id: string, fallback: string) => ({
+      id,
+      name: connectedUsers.find((user) => user.id === id)?.name ?? fallback,
+    });
+
+    const addNotice = (notice: SystemEvent) =>
+      setRoomNotices((current) => [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          chatId: roomId,
+          createdAt: new Date().toISOString(),
+          event: notice,
+        },
+      ]);
+
+    switch (event.type) {
+      case "room:updated": {
+        const { chat, changes, actorId } = event;
+
+        setSettings({
+          name: chat.name,
+          privacy: chat.privacy,
+          userLimit: chat.userLimit,
+          chatBgColor: chat.chatBgColor,
+          chatPhotoURL: chat.chatPhotoURL,
+        });
+        queryClient.invalidateQueries({
+          queryKey: [...CHATS_QUERY_KEY, "list"],
+        });
+        addNotice({
+          type: "chat:updated",
+          actor: toActor(actorId, "Um administrador"),
+          changes,
+        });
+        return;
+      }
+
+      case "room:promote-admin":
+      case "room:demote-admin": {
+        const isPromotion = event.type === "room:promote-admin";
+        const targetId = isPromotion
+          ? event.userIdToPromote
+          : event.userIdToDemote;
+        const actor = toActor(event.actorId, "Um administrador");
+        const target = toActor(targetId, "um usuário");
+
+        // Atualiza os escudos na lista de conectados
+        queryClient.invalidateQueries({
+          queryKey: [...CHATS_QUERY_KEY, roomId, "connected-users"],
+        });
+
+        // Se fui eu, a permissão de editar a sala muda na hora
+        if (targetId === currentUserId) {
+          setConnection((current) => ({ ...current, isAdmin: isPromotion }));
+        }
+
+        addNotice(
+          isPromotion
+            ? { type: "admins:added", actor, targets: [target] }
+            : { type: "admin:removed", actor, target },
+        );
+        return;
+      }
+
+      case "room:remove":
+      case "room:temporary-ban":
+      case "room:permanent-ban":
+      case "room:remove-ban": {
+        const actor = toActor(event.actorId, "Um administrador");
+        const target = {
+          id: event.target.id,
+          name: event.target.name ?? toActor(event.target.id, "um usuário").name,
+        };
+
+        queryClient.invalidateQueries({
+          queryKey: [...CHATS_QUERY_KEY, roomId],
+        });
+
+        addNotice(
+          event.type === "room:remove"
+            ? { type: "user:removed", actor, target }
+            : event.type === "room:temporary-ban"
+              ? {
+                  type: "user:kicked",
+                  actor,
+                  target,
+                  expiresAt: event.expiresAt,
+                }
+              : event.type === "room:permanent-ban"
+                ? { type: "user:blocked", actor, target }
+                : { type: "user:unblocked", actor, target },
+        );
+
+        // Fui eu que saí: mostra o aviso e trava o envio (o servidor já me tirou da sala)
+        if (event.type !== "room:remove-ban" && target.id === currentUserId) {
+          setIsConnected(false);
+        }
+        return;
+      }
+
+      case "room:deleted":
+        addNotice({
+          type: "chat:deleted",
+          actor: toActor(event.actorId, "O criador da sala"),
+          deletesAt: null,
+        });
+        queryClient.invalidateQueries({ queryKey: CHATS_QUERY_KEY });
+        setIsConnected(false);
+        return;
+    }
+  }
+
+  // Avisos que ficam entre a mensagem `index` e a próxima, pela data
+  const noticesAfter = (index: number) => {
+    const from = messages[index]?.createdAt;
+    const to = messages[index + 1]?.createdAt;
+
+    return roomNotices.filter(
+      ({ createdAt }) =>
+        (!from || createdAt >= from) && (!to || createdAt < to),
+    );
+  };
   const firstMessageId = messages[0]?.id;
   const lastMessageId = messages.at(-1)?.id;
   const previousLastMessageId = useRef<string | undefined>(undefined);
@@ -277,8 +408,6 @@ export default function Chat() {
   function openSettings() {
     resetSaveChat();
     resetDeleteChat();
-    promote.reset();
-    demote.reset();
     setIsSettingsOpen(true);
   }
 
@@ -298,32 +427,9 @@ export default function Chat() {
 
     const finish = () => setIsSettingsOpen(false);
 
-    const currentAdminIds = connectedUsers
-      .filter((user) => user.isAdmin)
-      .map((user) => user.id);
-    const promotedIds = changes.adminUserIds.filter(
-      (id) => !currentAdminIds.includes(id),
-    );
-    const demotedIds = currentAdminIds.filter(
-      (id) => !changes.adminUserIds.includes(id),
-    );
+    if (Object.keys(dto).length === 0) return finish();
 
-    const saveAdmins = () => {
-      if (promotedIds.length === 0 && demotedIds.length === 0) return finish();
-
-      promote.reset();
-      demote.reset();
-      Promise.all([
-        ...promotedIds.map((id) => promote.mutateAsync(id)),
-        ...demotedIds.map((id) => demote.mutateAsync(id)),
-      ])
-        .then(finish)
-        .catch(() => {});
-    };
-
-    if (Object.keys(dto).length === 0) return saveAdmins();
-
-    saveChat(dto, { onSuccess: saveAdmins });
+    saveChat(dto, { onSuccess: finish });
   }
 
   return (
@@ -367,9 +473,16 @@ export default function Chat() {
                   onRetry={retrySend}
                   onDiscard={discard}
                 />
+                {noticesAfter(index).map((notice) => (
+                  <SystemMessage key={notice.id} message={notice} />
+                ))}
               </Fragment>
             );
           })}
+          {messages.length === 0 &&
+            roomNotices.map((notice) => (
+              <SystemMessage key={notice.id} message={notice} />
+            ))}
           <ScrollAnchor ref={messagesEndRef} />
         </Messages>
 
@@ -399,11 +512,8 @@ export default function Chat() {
           connectedUsers={connectedUsers}
           onClose={() => setIsSettingsOpen(false)}
           onSave={handleSaveSettings}
-          isSaving={isSavingChat || promote.isPending || demote.isPending}
-          saveError={
-            (saveChatError || adminError) &&
-            getApiErrors(saveChatError ?? adminError)
-          }
+          isSaving={isSavingChat}
+          saveError={saveChatError && getApiErrors(saveChatError)}
           onDelete={isOwner ? () => removeChat(roomId) : undefined}
           isDeleting={isDeletingChat}
           deleteError={deleteChatError && getApiErrors(deleteChatError).message}

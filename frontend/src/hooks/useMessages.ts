@@ -18,6 +18,7 @@ import {
   type IChatMessage,
   type IMessage,
 } from "../model/messageModel";
+import type { ServerEvent } from "../model/realtimeModel";
 import { useAuth } from "./useAuth";
 import { useChatRealtime } from "./useChatRealtime";
 
@@ -35,7 +36,12 @@ const isRetryableError = (error: unknown) => {
   );
 };
 
-export const useMessages = (chatId: string, enabled: boolean) => {
+export const useMessages = (
+  chatId: string,
+  enabled: boolean,
+  // Eventos da sala que não são mensagens (ex.: "room:updated")
+  onRoomEvent?: (event: ServerEvent) => void,
+) => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const queryKey = [...CHATS_QUERY_KEY, chatId, "messages"];
@@ -125,6 +131,8 @@ export const useMessages = (chatId: string, enabled: boolean) => {
         event.type === "message:deleted"
       ) {
         confirm(event.message);
+      } else {
+        onRoomEvent?.(event);
       }
     },
     () => queryClient.invalidateQueries({ queryKey }),
