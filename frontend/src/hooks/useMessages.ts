@@ -168,6 +168,8 @@ export const useMessages = (
           userPhotoURL: user.userPhotoURL,
           profileBgColor: user.profileBgColor,
         },
+        kind: "user",
+        system: null,
         content,
         clientMessageId,
         editedAt: null,

@@ -13,14 +13,15 @@ import {
 } from "lucide-react";
 import styled from "styled-components";
 import { useAuth } from "../../hooks/useAuth";
-import type {
-  ISystemMessage,
-  SystemEventType,
-} from "../../model/systemMessageModel";
-import { getSystemMessageText } from "../../utils/systemMessageText";
+import type { ISystemChatMessage } from "../../model/messageModel";
+import type { SystemEventType } from "../../model/systemMessageModel";
+import {
+  getSystemMessageText,
+  toSystemEvent,
+} from "../../utils/systemMessageText";
 
 type SystemMessageProps = {
-  message: ISystemMessage;
+  message: ISystemChatMessage;
 };
 
 type Tone = "neutral" | "info" | "warning" | "danger";
@@ -104,13 +105,14 @@ const formatFullDate = (date: string) =>
 
 export function SystemMessage({ message }: SystemMessageProps) {
   const { user } = useAuth();
-  const { icon: Icon, tone } = EVENT_STYLE[message.event.type];
+  const event = toSystemEvent(message);
+  const { icon: Icon, tone } = EVENT_STYLE[event.type];
 
   return (
     <Wrapper role="status">
       <Pill $tone={tone} title={formatFullDate(message.createdAt)}>
         <Icon size={13} aria-hidden />
-        <span>{getSystemMessageText(message.event, user?.id)}</span>
+        <span>{getSystemMessageText(event, user?.id)}</span>
       </Pill>
     </Wrapper>
   );

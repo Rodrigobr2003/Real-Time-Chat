@@ -1,4 +1,6 @@
 import { Fragment, type ReactNode } from "react";
+import type { ISystemChatMessage } from "../model/messageModel";
+import type { RoomTarget } from "../model/realtimeModel";
 import type {
   ChatChange,
   ISystemActor,
@@ -46,6 +48,36 @@ const describeChange = (change: ChatChange): ReactNode => {
       return "mudou a cor da sala";
     case "password":
       return "alterou a senha da sala";
+  }
+};
+
+const toActor = ({ id, name }: RoomTarget): ISystemActor => ({
+  id,
+  name: name ?? "um usuário",
+});
+
+export const toSystemEvent = ({
+  owner,
+  system,
+}: ISystemChatMessage): SystemEvent => {
+  const actor = { id: owner.id, name: owner.name };
+
+  switch (system.type) {
+    case "chat:updated":
+      return { type: "chat:updated", actor, changes: system.changes };
+    case "chat:deleted":
+      return { type: "chat:deleted", actor, deletesAt: null };
+    case "admin:added":
+      return { type: "admins:added", actor, targets: [toActor(system.target)] };
+    case "user:kicked":
+      return {
+        type: "user:kicked",
+        actor,
+        target: toActor(system.target),
+        expiresAt: system.expiresAt,
+      };
+    default:
+      return { type: system.type, actor, target: toActor(system.target) };
   }
 };
 

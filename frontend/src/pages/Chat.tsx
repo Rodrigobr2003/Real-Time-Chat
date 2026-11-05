@@ -30,10 +30,6 @@ import {
 } from "../model/chatModel";
 import type { IMessage } from "../model/messageModel";
 import type { ServerEvent } from "../model/realtimeModel";
-import type {
-  ISystemMessage,
-  SystemEvent,
-} from "../model/systemMessageModel";
 import { getApiErrors } from "../utils/apiErrors";
 import { formatDayLabel, getDayKey } from "../utils/messageDate";
 
@@ -139,30 +135,10 @@ export default function Chat() {
     hasNextPage,
     isFetchingNextPage,
   } = useMessages(roomId, isConnected, handleRoomEvent);
-  const [roomNotices, setRoomNotices] = useState<ISystemMessage[]>([]);
-
-  // Avisos que chegam pelo socket enquanto a sala está aberta (ex.: edição)
-  function handleRoomEvent(event: ServerEvent) {
-    // O servidor manda só ids; o nome vem da lista de conectados
-    const toActor = (id: string, fallback: string) => ({
-      id,
-      name: connectedUsers.find((user) => user.id === id)?.name ?? fallback,
-    });
-
-    const addNotice = (notice: SystemEvent) =>
-      setRoomNotices((current) => [
-        ...current,
-        {
-          id: crypto.randomUUID(),
-          chatId: roomId,
-          createdAt: new Date().toISOString(),
-          event: notice,
-        },
-      ]);
-
+function handleRoomEvent(event: ServerEvent) {
     switch (event.type) {
       case "room:updated": {
-        const { chat, changes, actorId } = event;
+        const { chat } = event;
 
         setSettings({
           name: chat.name,
@@ -174,11 +150,6 @@ export default function Chat() {
         queryClient.invalidateQueries({
           queryKey: [...CHATS_QUERY_KEY, "list"],
         });
-        addNotice({
-          type: "chat:updated",
-          actor: toActor(actorId, "Um administrador"),
-          changes,
-        });
         return;
       }
 
@@ -188,85 +159,45 @@ export default function Chat() {
         const targetId = isPromotion
           ? event.userIdToPromote
           : event.userIdToDemote;
-        const actor = toActor(event.actorId, "Um administrador");
-        const target = toActor(targetId, "um usuário");
 
-        // Atualiza os escudos na lista de conectados
         queryClient.invalidateQueries({
           queryKey: [...CHATS_QUERY_KEY, roomId, "connected-users"],
         });
 
-        // Se fui eu, a permissão de editar a sala muda na hora
         if (targetId === currentUserId) {
           setConnection((current) => ({ ...current, isAdmin: isPromotion }));
         }
-
-        addNotice(
-          isPromotion
-            ? { type: "admins:added", actor, targets: [target] }
-            : { type: "admin:removed", actor, target },
-        );
         return;
       }
 
       case "room:remove":
       case "room:temporary-ban":
       case "room:permanent-ban":
-      case "room:remove-ban": {
-        const actor = toActor(event.actorId, "Um administrador");
-        const target = {
-          id: event.target.id,
-          name: event.target.name ?? toActor(event.target.id, "um usuário").name,
-        };
-
+      case "room:remove-ban":
         queryClient.invalidateQueries({
-          queryKey: [...CHATS_QUERY_KEY, roomId],
+          queryKey: [...CHATS_QUERY_KEY, roomId, "connected-users"],
+        });
+        queryClient.invalidateQueries({
+          queryKey: [...CHATS_QUERY_KEY, roomId, "blocked-users"],
         });
 
-        addNotice(
-          event.type === "room:remove"
-            ? { type: "user:removed", actor, target }
-            : event.type === "room:temporary-ban"
-              ? {
-                  type: "user:kicked",
-                  actor,
-                  target,
-                  expiresAt: event.expiresAt,
-                }
-              : event.type === "room:permanent-ban"
-                ? { type: "user:blocked", actor, target }
-                : { type: "user:unblocked", actor, target },
-        );
-
-        // Fui eu que saí: mostra o aviso e trava o envio (o servidor já me tirou da sala)
-        if (event.type !== "room:remove-ban" && target.id === currentUserId) {
+        if (
+          event.type !== "room:remove-ban" &&
+          event.target.id === currentUserId
+        ) {
           setIsConnected(false);
         }
         return;
-      }
 
       case "room:deleted":
-        addNotice({
-          type: "chat:deleted",
-          actor: toActor(event.actorId, "O criador da sala"),
-          deletesAt: null,
+        queryClient.invalidateQueries({
+          queryKey: [...CHATS_QUERY_KEY, "list"],
         });
-        queryClient.invalidateQueries({ queryKey: CHATS_QUERY_KEY });
         setIsConnected(false);
         return;
     }
   }
 
-  // Avisos que ficam entre a mensagem `index` e a próxima, pela data
-  const noticesAfter = (index: number) => {
-    const from = messages[index]?.createdAt;
-    const to = messages[index + 1]?.createdAt;
-
-    return roomNotices.filter(
-      ({ createdAt }) =>
-        (!from || createdAt >= from) && (!to || createdAt < to),
-    );
-  };
   const firstMessageId = messages[0]?.id;
   const lastMessageId = messages.at(-1)?.id;
   const previousLastMessageId = useRef<string | undefined>(undefined);
@@ -465,24 +396,21 @@ export default function Chat() {
                 {isNewDay && (
                   <DayTag>{formatDayLabel(message.createdAt)}</DayTag>
                 )}
-                <MessageBubble
-                  message={message}
-                  mine={message.owner.id === currentUserId}
-                  onEdit={openEditMessage}
-                  onDelete={({ id }) => remove.mutate(id)}
-                  onRetry={retrySend}
-                  onDiscard={discard}
-                />
-                {noticesAfter(index).map((notice) => (
-                  <SystemMessage key={notice.id} message={notice} />
-                ))}
+                {message.kind === "system" ? (
+                  <SystemMessage message={message} />
+                ) : (
+                  <MessageBubble
+                    message={message}
+                    mine={message.owner.id === currentUserId}
+                    onEdit={openEditMessage}
+                    onDelete={({ id }) => remove.mutate(id)}
+                    onRetry={retrySend}
+                    onDiscard={discard}
+                  />
+                )}
               </Fragment>
             );
           })}
-          {messages.length === 0 &&
-            roomNotices.map((notice) => (
-              <SystemMessage key={notice.id} message={notice} />
-            ))}
           <ScrollAnchor ref={messagesEndRef} />
         </Messages>
 

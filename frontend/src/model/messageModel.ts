@@ -1,3 +1,6 @@
+import type { RoomTarget } from "./realtimeModel";
+import type { ChatChange } from "./systemMessageModel";
+
 export const MESSAGE_MAX_LENGTH = 500;
 export const MESSAGES_PAGE_SIZE = 30;
 
@@ -11,7 +14,23 @@ export interface IMessageOwner {
 
 export type MessageStatus = "sent" | "pending" | "failed";
 
-export interface IMessage {
+export type MessageKind = "user" | "system";
+
+export type IMessageSystemEvent =
+  | { type: "chat:updated"; changes: ChatChange[] }
+  | { type: "chat:deleted" }
+  | {
+      type:
+        | "admin:added"
+        | "admin:removed"
+        | "user:removed"
+        | "user:blocked"
+        | "user:unblocked";
+      target: RoomTarget;
+    }
+  | { type: "user:kicked"; target: RoomTarget; expiresAt: string | null };
+
+interface IBaseMessage {
   id: string;
   chatId: string;
   owner: IMessageOwner;
@@ -22,6 +41,16 @@ export interface IMessage {
   createdAt: string;
 }
 
-export interface IChatMessage extends IMessage {
-  status: MessageStatus;
+export interface IUserMessage extends IBaseMessage {
+  kind: "user";
+  system: null;
 }
+
+export interface ISystemChatMessage extends IBaseMessage {
+  kind: "system";
+  system: IMessageSystemEvent;
+}
+
+export type IMessage = IUserMessage | ISystemChatMessage;
+
+export type IChatMessage = IMessage & { status: MessageStatus };
