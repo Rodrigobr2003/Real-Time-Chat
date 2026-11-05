@@ -14,12 +14,25 @@ const ChatMessagesSchema = new Schema(
       required: true,
       immutable: true,
     },
+    kind: {
+      type: String,
+      enum: ["user", "system"],
+      default: "user",
+      immutable: true,
+    },
     content: {
       type: String,
-      required: true,
+      required: function (this: { kind?: string }) {
+        return this.kind !== "system";
+      },
       trim: true,
       maxLength: MESSAGE_MAX_LENGTH,
       minLength: MESSAGE_MIN_LENGTH,
+    },
+    system: {
+      type: Schema.Types.Mixed,
+      default: null,
+      immutable: true,
     },
     clientMessageId: {
       type: String,

@@ -1,4 +1,21 @@
 import type { ChatDefaultInput, ConnectedUserDoc } from "./chat";
+import type { RoomChange, RoomTarget } from "./realtime";
+
+export type MessageKind = "user" | "system";
+
+export type SystemEvent =
+  | { type: "chat:updated"; changes: RoomChange[] }
+  | { type: "chat:deleted" }
+  | {
+      type:
+        | "admin:added"
+        | "admin:removed"
+        | "user:removed"
+        | "user:blocked"
+        | "user:unblocked";
+      target: RoomTarget;
+    }
+  | { type: "user:kicked"; target: RoomTarget; expiresAt: Date | null };
 
 export interface MessageDefaultInput extends ChatDefaultInput {
   content: string;
@@ -8,6 +25,10 @@ export interface MessageDefaultInput extends ChatDefaultInput {
 export interface CreateMessageResult {
   message: PublicMessage;
   created: boolean;
+}
+
+export interface SystemMessageInput extends ChatDefaultInput {
+  system: SystemEvent;
 }
 
 export interface MessageTargetInput extends ChatDefaultInput {
@@ -29,7 +50,9 @@ export type MessageDoc = {
   _id: { toString(): string };
   chatId: string;
   owner: MessageOwnerDoc;
-  content: string;
+  kind?: MessageKind | null;
+  content?: string | null;
+  system?: SystemEvent | null;
   clientMessageId?: string | null;
   editedAt?: Date | null;
   deletedAt?: Date | null;
@@ -44,7 +67,7 @@ export interface MessageOwner {
   profileBgColor: string;
 }
 
-export interface PublicMessage {
+interface BaseMessage {
   id: string;
   chatId: string;
   owner: MessageOwner;
@@ -54,3 +77,15 @@ export interface PublicMessage {
   deletedAt: Date | null;
   createdAt: Date;
 }
+
+export interface UserMessage extends BaseMessage {
+  kind: "user";
+  system: null;
+}
+
+export interface SystemMessage extends BaseMessage {
+  kind: "system";
+  system: SystemEvent;
+}
+
+export type PublicMessage = UserMessage | SystemMessage;

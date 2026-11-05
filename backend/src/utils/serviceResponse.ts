@@ -53,19 +53,25 @@ export const toPublicChat = (doc: ChatDoc): PublicChat => ({
   createdAt: doc.createdAt,
 });
 
-export const toPublicMessage = (doc: MessageDoc): PublicMessage => ({
-  id: doc._id.toString(),
-  chatId: doc.chatId,
-  owner: {
-    id: doc.owner._id.toString(),
-    name: doc.owner.name,
-    user: doc.owner.user,
-    userPhotoURL: toPhotoDataURL(doc.owner.userPhoto, USER_PHOTO_MIME_TYPE),
-    profileBgColor: doc.owner.profileBgColor ?? USER_BACKGROUND_COLOR[0],
-  },
-  content: doc.deletedAt ? "" : doc.content,
-  clientMessageId: doc.clientMessageId ?? null,
-  editedAt: doc.editedAt ?? null,
-  deletedAt: doc.deletedAt ?? null,
-  createdAt: doc.createdAt,
-});
+export const toPublicMessage = (doc: MessageDoc): PublicMessage => {
+  const base = {
+    id: doc._id.toString(),
+    chatId: doc.chatId,
+    owner: {
+      id: doc.owner._id.toString(),
+      name: doc.owner.name,
+      user: doc.owner.user,
+      userPhotoURL: toPhotoDataURL(doc.owner.userPhoto, USER_PHOTO_MIME_TYPE),
+      profileBgColor: doc.owner.profileBgColor ?? USER_BACKGROUND_COLOR[0],
+    },
+    content: doc.deletedAt ? "" : (doc.content ?? ""),
+    clientMessageId: doc.clientMessageId ?? null,
+    editedAt: doc.editedAt ?? null,
+    deletedAt: doc.deletedAt ?? null,
+    createdAt: doc.createdAt,
+  };
+
+  return doc.kind === "system" && doc.system
+    ? { ...base, kind: "system", system: doc.system }
+    : { ...base, kind: "user", system: null };
+};

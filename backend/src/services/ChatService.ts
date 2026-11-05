@@ -35,6 +35,7 @@ import type {
   MessageEditInput,
   MessageTargetInput,
   PublicMessage,
+  SystemEvent,
 } from "@typings/message";
 import type { RoomChange } from "@typings/realtime";
 import { IRealtimePublisher } from "./RealtimeHub";
@@ -96,6 +97,16 @@ export class ChatService {
     if (!(await this.chatRepository.verifyOwner(input))) {
       throw new ForbiddenError("Apenas o dono da sala pode fazer isso");
     }
+  }
+
+  private async announce(chatId: string, userId: string, system: SystemEvent) {
+    const message = await this.messageRespository.createSystem({
+      chatId,
+      userId,
+      system,
+    });
+
+    this.realtime.publish(chatId, { type: "message:created", message });
   }
 
   private async findConnectedTarget(input: ChatDefaultInput) {
@@ -168,6 +179,7 @@ export class ChatService {
           changes,
           actorId: userId,
         });
+        await this.announce(chatId, userId, { type: "chat:updated", changes });
       }
     }
 
@@ -181,6 +193,7 @@ export class ChatService {
     const deleted = await this.chatRepository.delete(input.chatId);
 
     if (deleted) {
+      await this.announce(input.chatId, input.userId, { type: "chat:deleted" });
       this.realtime.publish(input.chatId, {
         type: "room:deleted",
         chatId: input.chatId,
@@ -283,6 +296,7 @@ export class ChatService {
       throw new ConflictError("O usuário não está conectado nesta sala");
     }
 
+    await this.announce(input.chatId, userId, { type: "user:removed", target });
     this.realtime.publish(input.chatId, {
       type: "room:remove",
       chatId: input.chatId,
@@ -343,6 +357,17 @@ export class ChatService {
 
     await this.chatRepository.disconnect(input);
 
+    await this.announce(
+      input.chatId,
+      userId,
+      punishment.type === "blocked"
+        ? { type: "user:blocked", target }
+        : {
+            type: "user:kicked",
+            target,
+            expiresAt: punishment.expiresAt ?? null,
+          },
+    );
     this.realtime.publish(
       input.chatId,
       punishment.type === "blocked"
@@ -383,11 +408,17 @@ export class ChatService {
     const unblocked = await this.punishmentRepository.reset(input);
 
     if (unblocked) {
+      const target = { id: input.userId, name: name ?? null };
+
       this.realtime.publish(input.chatId, {
         type: "room:remove-ban",
         chatId: input.chatId,
         actorId: userId,
-        target: { id: input.userId, name: name ?? null },
+        target,
+      });
+      await this.announce(input.chatId, userId, {
+        type: "user:unblocked",
+        target,
       });
     }
 
@@ -505,6 +536,13 @@ export class ChatService {
         actorId: input.userId,
         userIdToPromote: input.userIdToPromote,
       });
+      await this.announce(input.chatId, input.userId, {
+        type: "admin:added",
+        target: await this.findConnectedTarget({
+          userId: input.userIdToPromote,
+          chatId: input.chatId,
+        }),
+      });
     }
 
     return promoted;
@@ -538,6 +576,13 @@ export class ChatService {
         chatId: input.chatId,
         actorId: input.userId,
         userIdToDemote: input.userIdToDemote,
+      });
+      await this.announce(input.chatId, input.userId, {
+        type: "admin:removed",
+        target: await this.findConnectedTarget({
+          userId: input.userIdToDemote,
+          chatId: input.chatId,
+        }),
       });
     }
 

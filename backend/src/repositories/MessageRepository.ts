@@ -8,6 +8,7 @@ import type {
   MessageEditInput,
   MessageTargetInput,
   PublicMessage,
+  SystemMessageInput,
 } from "@typings/message";
 import { toPublicMessage } from "@utils/serviceResponse";
 
@@ -20,8 +21,21 @@ const isDuplicateKeyError = (err: unknown) =>
   "code" in err &&
   err.code === DUPLICATE_KEY_ERROR;
 
+const userMessageFilter = (
+  messageId: string,
+  chatId: string,
+  userId: string,
+) => ({
+  _id: messageId,
+  chatId,
+  owner: userId,
+  kind: { $ne: "system" as const },
+  deletedAt: null,
+});
+
 export interface IMessageRepository {
   create(input: MessageDefaultInput): Promise<CreateMessageResult>;
+  createSystem(input: SystemMessageInput): Promise<PublicMessage>;
   find(
     input: Omit<MessageTargetInput, "userId">,
   ): Promise<{ owner: string; deletedAt: Date | null } | null>;
@@ -76,8 +90,23 @@ export class MessageRepository implements IMessageRepository {
     }
   }
 
+  async createSystem({ chatId, userId, system }: SystemMessageInput) {
+    const doc = await ChatMessageModel.create({
+      chatId,
+      owner: userId,
+      kind: "system",
+      system,
+    });
+
+    return (await this.findPublic(doc._id.toString()))!;
+  }
+
   async find({ chatId, messageId }: Omit<MessageTargetInput, "userId">) {
-    const doc = await ChatMessageModel.findOne({ _id: messageId, chatId })
+    const doc = await ChatMessageModel.findOne({
+      _id: messageId,
+      chatId,
+      kind: { $ne: "system" as const },
+    })
       .select("owner deletedAt")
       .lean();
 
@@ -88,7 +117,7 @@ export class MessageRepository implements IMessageRepository {
 
   async update({ chatId, userId, messageId, content }: MessageEditInput) {
     const { matchedCount } = await ChatMessageModel.updateOne(
-      { _id: messageId, chatId, owner: userId, deletedAt: null },
+      { ...userMessageFilter(messageId, chatId, userId) },
       { $set: { content, editedAt: new Date() } },
       { runValidators: true },
     );
@@ -98,7 +127,7 @@ export class MessageRepository implements IMessageRepository {
 
   async delete({ chatId, userId, messageId }: MessageTargetInput) {
     const { matchedCount } = await ChatMessageModel.updateOne(
-      { _id: messageId, chatId, owner: userId, deletedAt: null },
+      { ...userMessageFilter(messageId, chatId, userId) },
       { $set: { deletedAt: new Date() } },
     );
 
@@ -122,7 +151,13 @@ export class MessageRepository implements IMessageRepository {
     if (chatIds.length === 0) return [];
 
     const latest = await ChatMessageModel.aggregate([
-      { $match: { chatId: { $in: chatIds }, deletedAt: null } },
+      {
+        $match: {
+          chatId: { $in: chatIds },
+          deletedAt: null,
+          kind: { $ne: "system" as const },
+        },
+      },
       { $sort: { chatId: 1, createdAt: -1 } },
       { $group: { _id: "$chatId", doc: { $first: "$$ROOT" } } },
       { $replaceRoot: { newRoot: "$doc" } },
