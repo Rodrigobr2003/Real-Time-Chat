@@ -10,6 +10,7 @@ import {
 } from "../api/chatHelpers";
 import { ChatHeader } from "../components/chat/ChatHeader";
 import { EditMessageModal } from "../components/chat/EditMessageModal";
+import { PunishmentModal } from "../components/rooms/PunishmentModal";
 import { MessageBubble } from "../components/chat/MessageBubble";
 import { MessageInput } from "../components/chat/MessageInput";
 import { SystemMessage } from "../components/chat/SystemMessage";
@@ -26,11 +27,12 @@ import {
   CHAT_BG_COLORS,
   type IChatConnection,
   type IPublicChat,
+  type IPunishmentInfo,
   type IUpdateChatDTO,
 } from "../model/chatModel";
 import type { IMessage } from "../model/messageModel";
 import type { ServerEvent } from "../model/realtimeModel";
-import { getApiErrors } from "../utils/apiErrors";
+import { getApiErrors, getPunishment } from "../utils/apiErrors";
 import { formatDayLabel, getDayKey } from "../utils/messageDate";
 
 type ChatLocationState =
@@ -100,6 +102,7 @@ export default function Chat() {
   const [text, setText] = useState("");
   const locationState = useLocation().state as ChatLocationState;
   const room = locationState?.room;
+  const roomName = room?.name;
   const [connection, setConnection] = useState<IChatConnection>({
     isAdmin: locationState?.isAdmin ?? false,
     isOwner: locationState?.isOwner ?? false,
@@ -119,6 +122,7 @@ export default function Chat() {
   const pendingLeave = useRef<{ roomId: string; timer: number } | null>(null);
   const currentUserId = useAuth().user?.id;
   const [isConnected, setIsConnected] = useState(false);
+  const [punishment, setPunishment] = useState<IPunishmentInfo | null>(null);
   const [editingMessage, setEditingMessage] = useState<IMessage | null>(null);
   const messagesRef = useRef<HTMLElement>(null);
   const messagesTopRef = useRef<HTMLDivElement>(null);
@@ -186,6 +190,14 @@ function handleRoomEvent(event: ServerEvent) {
           event.target.id === currentUserId
         ) {
           setIsConnected(false);
+
+          if (event.type === "room:temporary-ban") {
+            setPunishment({ type: "temporary", expiresAt: event.expiresAt });
+          }
+
+          if (event.type === "room:permanent-ban") {
+            setPunishment({ type: "blocked", expiresAt: null });
+          }
         }
         return;
 
@@ -257,7 +269,11 @@ function handleRoomEvent(event: ServerEvent) {
         if (!isActive) return;
         navigate("/home", {
           replace: true,
-          state: { joinError: getApiErrors(error).message },
+          state: {
+            joinError: getApiErrors(error).message,
+            punishment: getPunishment(error),
+            roomName,
+          },
         });
       });
 
@@ -280,7 +296,7 @@ function handleRoomEvent(event: ServerEvent) {
       window.removeEventListener("pagehide", leave);
       pendingLeave.current = { roomId, timer: window.setTimeout(leave, 0) };
     };
-  }, [roomId, queryClient, navigate]);
+  }, [roomId, roomName, queryClient, navigate]);
 
   const {
     mutate: saveChat,
@@ -421,6 +437,12 @@ function handleRoomEvent(event: ServerEvent) {
           disabled={!isConnected}
         />
       </Container>
+
+      <PunishmentModal
+        punishment={punishment}
+        roomName={settings.name}
+        onClose={() => navigate("/home", { replace: true })}
+      />
 
       {editingMessage && (
         <EditMessageModal

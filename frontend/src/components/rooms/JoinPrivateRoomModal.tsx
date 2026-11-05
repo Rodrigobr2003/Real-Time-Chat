@@ -3,8 +3,12 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { useChat } from "../../hooks/useChat";
-import { CHAT_PASSWORD_MAX_LENGTH, type IPublicChat } from "../../model/chatModel";
-import { getApiErrors } from "../../utils/apiErrors";
+import {
+  CHAT_PASSWORD_MAX_LENGTH,
+  type IPublicChat,
+  type IPunishmentInfo,
+} from "../../model/chatModel";
+import { getApiErrors, getPunishment } from "../../utils/apiErrors";
 import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/Button";
 import { Form } from "../ui/Card";
@@ -15,6 +19,7 @@ import { PasswordInput } from "../ui/PasswordInput";
 type JoinPrivateRoomModalProps = {
   room: IPublicChat | null;
   onClose: () => void;
+  onPunished: (punishment: IPunishmentInfo, roomName: string) => void;
 };
 
 const RoomInfo = styled.div`
@@ -45,7 +50,11 @@ const Actions = styled.div`
   }
 `;
 
-export function JoinPrivateRoomModal({ room, onClose }: JoinPrivateRoomModalProps) {
+export function JoinPrivateRoomModal({
+  room,
+  onClose,
+  onPunished,
+}: JoinPrivateRoomModalProps) {
   const navigate = useNavigate();
   const { connectChatMutation, isConnectPending } = useChat();
   const [password, setPassword] = useState("");
@@ -73,6 +82,13 @@ export function JoinPrivateRoomModal({ room, onClose }: JoinPrivateRoomModalProp
           navigate(`/chat/${room.chatId}`, { state: { room, ...connection } });
         },
         onError: (apiError) => {
+          const punishment = getPunishment(apiError);
+
+          if (punishment) {
+            handleClose();
+            return onPunished(punishment, room.name);
+          }
+
           const { message, fields } = getApiErrors(apiError);
           setError(fields?.password ?? message);
         },

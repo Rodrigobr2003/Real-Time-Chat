@@ -4,12 +4,13 @@ import { useLocation, useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { useChat } from "../../hooks/useChat";
 import { useChatList } from "../../hooks/useChatList";
-import type { IPublicChat } from "../../model/chatModel";
-import { getApiErrors } from "../../utils/apiErrors";
+import type { IPublicChat, IPunishmentInfo } from "../../model/chatModel";
+import { getApiErrors, getPunishment } from "../../utils/apiErrors";
 import { Button } from "../ui/Button";
 import { FieldError } from "../ui/Input";
 import { CreateRoomModal } from "./CreateRoomModal";
 import { JoinPrivateRoomModal } from "./JoinPrivateRoomModal";
+import { PunishmentModal } from "./PunishmentModal";
 import { RoomFilters } from "./RoomFilters";
 import { RoomItem } from "./RoomItem";
 
@@ -91,8 +92,25 @@ export function RoomsTab() {
     isFetchingNextChatsPage,
   } = useChatList();
   const { connectChatMutation, isConnectPending } = useChat();
-  const locationState = useLocation().state as { joinError?: string } | null;
-  const [joinError, setJoinError] = useState(locationState?.joinError ?? "");
+  const locationState = useLocation().state as {
+    joinError?: string;
+    punishment?: IPunishmentInfo;
+    roomName?: string;
+  } | null;
+  const [joinError, setJoinError] = useState(
+    locationState?.punishment ? "" : (locationState?.joinError ?? ""),
+  );
+  const [punished, setPunished] = useState<{
+    punishment: IPunishmentInfo;
+    roomName?: string;
+  } | null>(
+    locationState?.punishment
+      ? {
+          punishment: locationState.punishment,
+          roomName: locationState.roomName,
+        }
+      : null,
+  );
   const [privateRoom, setPrivateRoom] = useState<IPublicChat | null>(null);
 
   function openRoom(room: IPublicChat) {
@@ -101,11 +119,21 @@ export function RoomsTab() {
     if (room.privacy === "private") return setPrivateRoom(room);
     if (isConnectPending) return;
 
-    connectChatMutation({ chatId: room.chatId }, {
-      onSuccess: (connection) =>
-        navigate(`/chat/${room.chatId}`, { state: { room, ...connection } }),
-      onError: (error) => setJoinError(getApiErrors(error).message),
-    });
+    connectChatMutation(
+      { chatId: room.chatId },
+      {
+        onSuccess: (connection) =>
+          navigate(`/chat/${room.chatId}`, { state: { room, ...connection } }),
+        onError: (error) => {
+          const punishment = getPunishment(error);
+
+          if (punishment)
+            return setPunished({ punishment, roomName: room.name });
+
+          setJoinError(getApiErrors(error).message);
+        },
+      },
+    );
   }
 
   function renderRooms() {
@@ -145,7 +173,11 @@ export function RoomsTab() {
     return (
       <>
         {chats.map((room) => (
-          <RoomItem key={room.chatId} room={room} onClick={() => openRoom(room)} />
+          <RoomItem
+            key={room.chatId}
+            room={room}
+            onClick={() => openRoom(room)}
+          />
         ))}
         {hasNextChatsPage && (
           <LoadMoreButton
@@ -178,9 +210,24 @@ export function RoomsTab() {
         Nova sala
       </Button>
 
-      <CreateRoomModal open={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <CreateRoomModal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
 
-      <JoinPrivateRoomModal room={privateRoom} onClose={() => setPrivateRoom(null)} />
+      <JoinPrivateRoomModal
+        room={privateRoom}
+        onClose={() => setPrivateRoom(null)}
+        onPunished={(punishment, roomName) =>
+          setPunished({ punishment, roomName })
+        }
+      />
+
+      <PunishmentModal
+        punishment={punished?.punishment ?? null}
+        roomName={punished?.roomName}
+        onClose={() => setPunished(null)}
+      />
     </Wrapper>
   );
 }

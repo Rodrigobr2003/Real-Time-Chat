@@ -1,9 +1,15 @@
 import { isAxiosError } from "axios";
+import type { IPunishmentInfo } from "../model/chatModel";
 
 interface ApiErrorBody {
   message?: string;
   errors?: Record<string, string[] | undefined>;
+  punishment?: IPunishmentInfo;
 }
+
+export const getPunishment = (error: unknown) =>
+  (isAxiosError<ApiErrorBody>(error) && error.response?.data?.punishment) ||
+  null;
 
 // Traduz a resposta de erro do backend (400/409/500) para o formulário.
 export const getApiErrors = (error: unknown) => {

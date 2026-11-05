@@ -69,6 +69,11 @@ export interface IConnectedUser {
 
 export type PunishmentType = "temporary" | "blocked";
 
+export interface IPunishmentInfo {
+  type: PunishmentType;
+  expiresAt: string | null;
+}
+
 export interface IPunishmentResult {
   type: PunishmentType;
   expiresAt: string | null;
