@@ -261,13 +261,17 @@ export class ChatService {
     const punishment = await this.punishmentRepository.find(input);
 
     if (punishment?.type === "blocked") {
-      throw new PunishedError("Você está bloqueado nesta sala");
+      throw new PunishedError("Você está bloqueado nesta sala", {
+        type: "blocked",
+        expiresAt: null,
+      });
     }
 
     if (isActiveTemporary(punishment)) {
       const minutes = minutesUntil(punishment!.expiresAt!);
       throw new PunishedError(
         `Você foi expulso desta sala. Tente novamente em ${minutes} min`,
+        { type: "temporary", expiresAt: punishment!.expiresAt! },
       );
     }
 

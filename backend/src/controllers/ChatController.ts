@@ -233,7 +233,9 @@ export class ChatController {
       return res.status(200).json(connection);
     } catch (err) {
       if (err instanceof PunishedError) {
-        return res.status(403).json({ message: err.message });
+        return res
+          .status(403)
+          .json({ message: err.message, punishment: err.punishment });
       }
 
       if (err instanceof ForbiddenError) {
