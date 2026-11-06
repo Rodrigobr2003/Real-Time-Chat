@@ -54,9 +54,20 @@ const UserSchema = new Schema(
       lowercase: true,
       match: [EMAIL_REGEX, "E-mail inválido"],
     },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      select: false,
+    },
     passwordHash: {
       type: String,
-      required: [true, "A senha é obrigatória"],
+      required: [
+        function (this: { googleId?: string }) {
+          return !this.googleId;
+        },
+        "A senha é obrigatória",
+      ],
       select: false,
     },
     description: {

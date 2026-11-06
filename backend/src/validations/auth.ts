@@ -4,3 +4,7 @@ export const loginSchema = z.object({
   userOrEmail: z.string().trim().min(1, "Informe o usuário ou e-mail"),
   password: z.string().min(1, "Informe a senha"),
 });
+
+export const googleLoginSchema = z.object({
+  credential: z.string().min(1, "Credencial do Google ausente"),
+});

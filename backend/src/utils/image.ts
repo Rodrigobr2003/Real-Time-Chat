@@ -16,3 +16,15 @@ export const compressPhoto = async (input: Buffer) => {
     throw new InvalidImageError("Imagem inválida ou corrompida");
   }
 };
+
+export const downloadPhoto = async (url: string | null) => {
+  if (!url) return null;
+
+  try {
+    const res = await fetch(url.replace(/=s\d+-c$/, "=s256-c"));
+    if (!res.ok) return null;
+    return await compressPhoto(Buffer.from(await res.arrayBuffer()));
+  } catch {
+    return null;
+  }
+};

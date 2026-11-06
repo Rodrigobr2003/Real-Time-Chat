@@ -22,6 +22,10 @@ async function startServer() {
     throw new Error("CLIENT_URL não definida no .env");
   }
 
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    throw new Error("GOOGLE_CLIENT_ID não definida no .env");
+  }
+
   await mongoose.connect(MONGO_URI);
 
   const app = createServer();

@@ -12,7 +12,7 @@ export type LoginIdentifier =
 
 export interface AuthUser {
   user: PublicUser;
-  passwordHash: string;
+  passwordHash?: string | null;
 }
 
 export interface AuthSession {
