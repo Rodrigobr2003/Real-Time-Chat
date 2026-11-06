@@ -1,6 +1,7 @@
 import { MessageCircle } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { GoogleLoginButton } from "../components/auth/GoogleLoginButton";
 import { Button } from "../components/ui/Button";
 import {
   Card,
@@ -81,6 +82,8 @@ export default function Login() {
             {isPending ? "Entrando..." : "Entrar"}
           </Button>
         </Form>
+
+        <GoogleLoginButton text="signin_with" onError={setError} />
 
         <FooterText>
           Ainda não tem perfil? <Link to="/register">Criar novo perfil</Link>

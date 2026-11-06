@@ -1,6 +1,6 @@
 import { useEffect, useMemo, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getMe, logout, manualLogin } from "../api/auth";
+import { getMe, googleLogin, logout, manualLogin } from "../api/auth";
 import type { IPublicUser } from "../model/userModel";
 import {
   AuthContext,
@@ -52,6 +52,12 @@ export const AuthProvider = ({ children }: IAuthProvider) => {
     onSuccess: (loggedUser) => setUser(loggedUser),
   });
 
+  const { mutate: googleLoginMutation, isPending: isGoogleLoginPending } =
+    useMutation({
+      mutationFn: googleLogin,
+      onSuccess: (loggedUser) => setUser(loggedUser),
+    });
+
   const { mutate: logoutMutation, isPending: isLogoutPending } = useMutation({
     mutationFn: logout,
     onSuccess: () => {
@@ -68,6 +74,8 @@ export const AuthProvider = ({ children }: IAuthProvider) => {
       isCheckingSession,
       loginMutation,
       isLoginPending,
+      googleLoginMutation,
+      isGoogleLoginPending,
       logoutMutation,
       isLogoutPending,
     }),
@@ -76,6 +84,8 @@ export const AuthProvider = ({ children }: IAuthProvider) => {
       isCheckingSession,
       loginMutation,
       isLoginPending,
+      googleLoginMutation,
+      isGoogleLoginPending,
       logoutMutation,
       isLogoutPending,
     ],

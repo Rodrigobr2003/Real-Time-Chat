@@ -2,6 +2,7 @@ import { UserPlus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import styled from "styled-components";
+import { GoogleLoginButton } from "../components/auth/GoogleLoginButton";
 import { Button } from "../components/ui/Button";
 import {
   Card,
@@ -173,6 +174,8 @@ export default function Register() {
             {isCreationPending ? "Criando..." : "Criar perfil"}
           </Button>
         </Form>
+
+        <GoogleLoginButton text="signup_with" onError={setFormError} />
 
         <FooterText>
           Já tem perfil? <Link to="/">Entrar</Link>

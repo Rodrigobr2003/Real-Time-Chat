@@ -4,6 +4,7 @@ import { refreshSession } from "./auth";
 
 const SKIP_REFRESH = [
   "/auth/public/login",
+  "/auth/public/google",
   "/auth/public/refresh",
   "/auth/private/logout",
 ];

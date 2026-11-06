@@ -10,6 +10,8 @@ export interface IAuthContext {
   isCheckingSession: boolean;
   loginMutation: UseMutateFunction<IPublicUser, Error, ILoginDTO>;
   isLoginPending: boolean;
+  googleLoginMutation: UseMutateFunction<IPublicUser, Error, string>;
+  isGoogleLoginPending: boolean;
   logoutMutation: UseMutateFunction<void, Error, void>;
   isLogoutPending: boolean;
 }
