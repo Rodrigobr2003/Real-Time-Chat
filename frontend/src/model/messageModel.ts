@@ -30,12 +30,18 @@ export type IMessageSystemEvent =
     }
   | { type: "user:kicked"; target: RoomTarget; expiresAt: string | null };
 
+export interface IMessageReaction {
+  emoji: string;
+  user: IMessageOwner;
+}
+
 interface IBaseMessage {
   id: string;
   chatId: string;
   owner: IMessageOwner;
   content: string;
   clientMessageId: string | null;
+  reactions: IMessageReaction[];
   editedAt: string | null;
   deletedAt: string | null;
   createdAt: string;

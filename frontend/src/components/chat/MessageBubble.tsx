@@ -10,8 +10,11 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
+import { useAuth } from "../../hooks/useAuth";
 import type { IChatMessage } from "../../model/messageModel";
 import { Avatar } from "../ui/Avatar";
+import { EmojiPickerButton } from "./EmojiPickerButton";
+import { MessageReactions } from "./MessageReactions";
 
 type MessageAction = (message: IChatMessage) => void;
 
@@ -22,13 +25,34 @@ type MessageBubbleProps = {
   onDelete: MessageAction;
   onRetry: MessageAction;
   onDiscard: MessageAction;
+  onReact: (message: IChatMessage, emoji: string) => void;
 };
 
-const Row = styled.div<{ $mine: boolean }>`
+const ReactButton = styled(EmojiPickerButton)<{ $visible: boolean }>`
+  align-self: center;
+  flex-shrink: 0;
+  opacity: ${({ $visible }) => ($visible ? 1 : 0)};
+  transition: opacity 0.15s;
+
+  &:focus-within {
+    opacity: 1;
+  }
+
+  @media (hover: none) {
+    opacity: ${({ $visible }) => ($visible ? 1 : 0.6)};
+  }
+`;
+
+const Row = styled.div<{ $mine: boolean; $hasReactions: boolean }>`
   display: flex;
   align-items: flex-start;
   gap: 8px;
   flex-direction: ${({ $mine }) => ($mine ? "row-reverse" : "row")};
+  margin-bottom: ${({ $hasReactions }) => ($hasReactions ? "14px" : "0")};
+
+  &:hover ${ReactButton} {
+    opacity: 1;
+  }
 `;
 
 const MenuTrigger = styled.button<{ $open: boolean }>`
@@ -172,13 +196,18 @@ export function MessageBubble({
   onDelete,
   onRetry,
   onDiscard,
+  onReact,
 }: MessageBubbleProps) {
+  const currentUserId = useAuth().user?.id;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
   const bubbleRef = useRef<HTMLDivElement>(null);
   const isDeleted = !!message.deletedAt;
   const isFailed = message.status === "failed";
   const canManage =
     mine && !isDeleted && (message.status === "sent" || isFailed);
+  const canReact = !isDeleted && message.status === "sent";
+  const hasReactions = canReact && message.reactions.length > 0;
 
   useEffect(() => {
     if (!isMenuOpen) return;
@@ -199,7 +228,7 @@ export function MessageBubble({
   }
 
   return (
-    <Row $mine={mine}>
+    <Row $mine={mine} $hasReactions={hasReactions}>
       {!mine && (
         <Avatar
           name={message.owner.name}
@@ -295,7 +324,25 @@ export function MessageBubble({
             <Clock size={12} aria-label="Enviando" />
           )}
         </Meta>
+        {hasReactions && (
+          <MessageReactions
+            reactions={message.reactions}
+            mine={mine}
+            currentUserId={currentUserId}
+            onRemove={(emoji) => onReact(message, emoji)}
+          />
+        )}
       </Bubble>
+      {canReact && (
+        <ReactButton
+          $visible={isPickerOpen}
+          label="Reagir à mensagem"
+          iconSize={18}
+          closeOnSelect
+          onOpenChange={setIsPickerOpen}
+          onSelect={(emoji) => onReact(message, emoji)}
+        />
+      )}
     </Row>
   );
 }

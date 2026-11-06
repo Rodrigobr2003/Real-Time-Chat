@@ -135,6 +135,7 @@ export default function Chat() {
     discard,
     edit,
     remove,
+    react,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -422,6 +423,7 @@ function handleRoomEvent(event: ServerEvent) {
                     onDelete={({ id }) => remove.mutate(id)}
                     onRetry={retrySend}
                     onDiscard={discard}
+                    onReact={({ id }, emoji) => react.mutate({ id, emoji })}
                   />
                 )}
               </Fragment>

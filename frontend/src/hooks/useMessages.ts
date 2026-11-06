@@ -10,6 +10,7 @@ import {
   deleteMessage,
   editMessage,
   listMessages,
+  reactToMessage,
   sendMessage,
 } from "../api/messageHelpers";
 import { CHATS_QUERY_KEY } from "../context/chatListContextInstance";
@@ -128,7 +129,8 @@ export const useMessages = (
       if (
         event.type === "message:created" ||
         event.type === "message:updated" ||
-        event.type === "message:deleted"
+        event.type === "message:deleted" ||
+        event.type === "message:reacted"
       ) {
         confirm(event.message);
       } else {
@@ -172,6 +174,7 @@ export const useMessages = (
         system: null,
         content,
         clientMessageId,
+        reactions: [],
         editedAt: null,
         deletedAt: null,
         createdAt: new Date().toISOString(),
@@ -205,5 +208,11 @@ export const useMessages = (
     onSuccess: upsert,
   });
 
-  return { ...query, messages, send, retrySend, discard, edit, remove };
+  const react = useMutation({
+    mutationFn: ({ id, emoji }: { id: string; emoji: string }) =>
+      reactToMessage(chatId, id, emoji),
+    onSuccess: upsert,
+  });
+
+  return { ...query, messages, send, retrySend, discard, edit, remove, react };
 };

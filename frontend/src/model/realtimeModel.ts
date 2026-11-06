@@ -13,7 +13,11 @@ export type ClientEvent =
   | { type: "rooms:subscribe" | "rooms:unsubscribe" };
 
 type MessageEvent = {
-  type: "message:created" | "message:updated" | "message:deleted";
+  type:
+    | "message:created"
+    | "message:updated"
+    | "message:deleted"
+    | "message:reacted";
   message: IMessage;
 };
 

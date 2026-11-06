@@ -41,6 +41,19 @@ export const editMessage = async (
   return data;
 };
 
+export const reactToMessage = async (
+  chatId: string,
+  messageId: string,
+  emoji: string,
+) => {
+  const { data } = await api.patch<IMessage>(
+    `${messagesPath(chatId)}/${messageId}/reactions`,
+    { emoji },
+  );
+
+  return data;
+};
+
 export const deleteMessage = async (chatId: string, messageId: string) => {
   const { data } = await api.delete<IMessage>(
     `${messagesPath(chatId)}/${messageId}`,

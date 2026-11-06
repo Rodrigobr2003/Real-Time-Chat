@@ -1460,6 +1460,13 @@ electron-to-chromium@^1.5.427:
   resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.5.438.tgz#7531eb37e3eb46f9688106df3753d06114e5b621"
   integrity sha512-AN9xMU1hJiT65LkCUPL1DZm5TCbOPb2Qsm5pYwFLEXp6/qj9SdT4yMiqs7Qqstwvkn1zF7l36SRGt+s6XcJ0FA==
 
+emoji-picker-react@^5.1.4:
+  version "5.1.4"
+  resolved "https://registry.yarnpkg.com/emoji-picker-react/-/emoji-picker-react-5.1.4.tgz#e369f6ba2a5a5943ef0df6c5fd13c41f0d8b81c8"
+  integrity sha512-kWBAgDCFPcRJrINeRE7/o7VAVNc0Yeg1n7gMHSvJ54qffidCV8Jdmeb9iEHkx1CtClzhnutCax8bQFDTHAbyTg==
+  dependencies:
+    shipstyles "1.0.0"
+
 encodeurl@^2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/encodeurl/-/encodeurl-2.0.0.tgz#7b8ea898077d7e409d3ac45474ea38eaf0857a58"
@@ -2787,6 +2794,11 @@ shebang-regex@^3.0.0:
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/shebang-regex/-/shebang-regex-3.0.0.tgz#ae16f1644d873ecad843b0307b143362d4c42172"
   integrity sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==
+
+shipstyles@1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/shipstyles/-/shipstyles-1.0.0.tgz#8fd95f4c095748a1a47086ea5ce447405d779531"
+  integrity sha512-1AcihfXo/mSxqeOdoKqq/5TNv+vSH0dBYPFq88PUX5FBkK5pRmY5TP9SuMNio85PQ+euUI67+KpSVk1cUVDCgA==
 
 side-channel-list@^1.0.1:
   version "1.0.1"

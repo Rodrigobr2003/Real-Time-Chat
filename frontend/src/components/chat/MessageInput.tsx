@@ -1,7 +1,8 @@
 import { SendHorizontal } from "lucide-react";
-import type { FormEvent } from "react";
+import { useRef, type FormEvent } from "react";
 import styled from "styled-components";
 import { MESSAGE_MAX_LENGTH } from "../../model/messageModel";
+import { EmojiPickerButton } from "./EmojiPickerButton";
 
 type MessageInputProps = {
   value: string;
@@ -27,11 +28,24 @@ const Bar = styled.form`
   }
 `;
 
-const Field = styled.input`
+const FieldBox = styled.div`
+  position: relative;
   flex: 1;
   min-width: 0;
+`;
+
+const InputEmoji = styled(EmojiPickerButton)`
+  position: absolute;
+  left: 6px;
+  top: 0;
+  bottom: 0;
+  align-items: center;
+`;
+
+const Field = styled.input`
+  width: 100%;
   height: 44px;
-  padding: 0 16px;
+  padding: 0 16px 0 46px;
   border-radius: ${({ theme }) => theme.radius.full};
   border: 1px solid ${({ theme }) => theme.colors.border};
   background: ${({ theme }) => theme.colors.surfaceAlt};
@@ -76,19 +90,41 @@ export function MessageInput({
   onSend,
   disabled = false,
 }: MessageInputProps) {
+  const fieldRef = useRef<HTMLInputElement>(null);
+
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (value.trim() && !disabled) onSend();
   }
 
+  function insertEmoji(emoji: string) {
+    const field = fieldRef.current;
+    const start = field?.selectionStart ?? value.length;
+    const end = field?.selectionEnd ?? value.length;
+    const next = value.slice(0, start) + emoji + value.slice(end);
+
+    if (next.length > MESSAGE_MAX_LENGTH) return;
+
+    onChange(next);
+
+    requestAnimationFrame(() => {
+      const caret = start + emoji.length;
+      field?.setSelectionRange(caret, caret);
+    });
+  }
+
   return (
     <Bar onSubmit={handleSubmit}>
-      <Field
-        placeholder="Digite uma mensagem..."
-        value={value}
-        maxLength={MESSAGE_MAX_LENGTH}
-        onChange={(event) => onChange(event.target.value)}
-      />
+      <FieldBox>
+        <Field
+          ref={fieldRef}
+          placeholder="Digite uma mensagem..."
+          value={value}
+          maxLength={MESSAGE_MAX_LENGTH}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <InputEmoji onSelect={insertEmoji} disabled={disabled} />
+      </FieldBox>
       <SendButton type="submit" disabled={!value.trim() || disabled} aria-label="Enviar">
         <SendHorizontal size={20} />
       </SendButton>
