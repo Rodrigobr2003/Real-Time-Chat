@@ -39,6 +39,11 @@ const ChatMessagesSchema = new Schema(
       default: null,
       immutable: true,
     },
+    reactions: {
+      type: Map,
+      of: String,
+      default: {},
+    },
     editedAt: {
       type: Date,
       default: null,

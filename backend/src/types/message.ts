@@ -39,6 +39,10 @@ export interface MessageEditInput extends MessageTargetInput {
   content: string;
 }
 
+export interface MessageReactionInput extends MessageTargetInput {
+  emoji: string;
+}
+
 export interface ListMessagesInput extends ChatDefaultInput {
   before?: Date;
   limit: number;
@@ -53,6 +57,7 @@ export type MessageDoc = {
   kind?: MessageKind | null;
   content?: string | null;
   system?: SystemEvent | null;
+  reactions?: Record<string, string> | null;
   clientMessageId?: string | null;
   editedAt?: Date | null;
   deletedAt?: Date | null;
@@ -67,12 +72,18 @@ export interface MessageOwner {
   profileBgColor: string;
 }
 
+export interface MessageReaction {
+  emoji: string;
+  user: MessageOwner;
+}
+
 interface BaseMessage {
   id: string;
   chatId: string;
   owner: MessageOwner;
   content: string;
   clientMessageId: string | null;
+  reactions: MessageReaction[];
   editedAt: Date | null;
   deletedAt: Date | null;
   createdAt: Date;

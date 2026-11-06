@@ -17,6 +17,7 @@ import {
   listMessagesSchema,
   messageBodySchema,
   messageParamsSchema,
+  reactionBodySchema,
   sendMessageBodySchema,
 } from "@validations/message";
 
@@ -508,6 +509,40 @@ export class ChatController {
       const message = await this.chatService.deleteMessage({
         ...params.data,
         userId: req.userId!,
+      });
+
+      if (!message) {
+        return res.status(404).json({ message: "Mensagem não encontrada" });
+      }
+
+      return res.status(200).json(message);
+    } catch (err) {
+      return handleMessageError(err, res);
+    }
+  };
+
+  reactToMessage = async (req: Request, res: Response) => {
+    const params = messageParamsSchema.safeParse(req.params);
+
+    if (!params.success) {
+      return res
+        .status(400)
+        .json({ errors: z.flattenError(params.error).fieldErrors });
+    }
+
+    const body = reactionBodySchema.safeParse(req.body ?? {});
+
+    if (!body.success) {
+      return res
+        .status(400)
+        .json({ errors: z.flattenError(body.error).fieldErrors });
+    }
+
+    try {
+      const message = await this.chatService.reactToMessage({
+        ...params.data,
+        userId: req.userId!,
+        emoji: body.data.emoji,
       });
 
       if (!message) {

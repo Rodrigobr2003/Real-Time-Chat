@@ -12,7 +12,12 @@ import type {
   ConnectedUserDoc,
   PublicChat,
 } from "@typings/chat";
-import type { MessageDoc, PublicMessage } from "@typings/message";
+import type {
+  MessageDoc,
+  MessageOwner,
+  MessageOwnerDoc,
+  PublicMessage,
+} from "@typings/message";
 import type { PublicUser, UserDoc } from "@typings/user";
 
 type StoredPhoto = { toString(encoding: "base64"): string } | null | undefined;
@@ -53,19 +58,29 @@ export const toPublicChat = (doc: ChatDoc): PublicChat => ({
   createdAt: doc.createdAt,
 });
 
-export const toPublicMessage = (doc: MessageDoc): PublicMessage => {
+export const toMessageOwner = (doc: MessageOwnerDoc): MessageOwner => ({
+  id: doc._id.toString(),
+  name: doc.name,
+  user: doc.user,
+  userPhotoURL: toPhotoDataURL(doc.userPhoto, USER_PHOTO_MIME_TYPE),
+  profileBgColor: doc.profileBgColor ?? USER_BACKGROUND_COLOR[0],
+});
+
+export const toPublicMessage = (
+  doc: MessageDoc,
+  reactors: Map<string, MessageOwner> = new Map(),
+): PublicMessage => {
   const base = {
     id: doc._id.toString(),
     chatId: doc.chatId,
-    owner: {
-      id: doc.owner._id.toString(),
-      name: doc.owner.name,
-      user: doc.owner.user,
-      userPhotoURL: toPhotoDataURL(doc.owner.userPhoto, USER_PHOTO_MIME_TYPE),
-      profileBgColor: doc.owner.profileBgColor ?? USER_BACKGROUND_COLOR[0],
-    },
+    owner: toMessageOwner(doc.owner),
     content: doc.deletedAt ? "" : (doc.content ?? ""),
     clientMessageId: doc.clientMessageId ?? null,
+    reactions: Object.entries(doc.reactions ?? {}).flatMap(([id, emoji]) => {
+      const user = reactors.get(id);
+
+      return user ? [{ emoji, user }] : [];
+    }),
     editedAt: doc.editedAt ?? null,
     deletedAt: doc.deletedAt ?? null,
     createdAt: doc.createdAt,

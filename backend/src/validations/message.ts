@@ -26,6 +26,14 @@ export const sendMessageBodySchema = messageBodySchema.extend({
   clientMessageId: z.uuid("Identificador da mensagem inválido"),
 });
 
+export const reactionBodySchema = z.object({
+  emoji: z
+    .string("Informe a reação")
+    .trim()
+    .min(1, "Informe a reação")
+    .max(32, "Reação inválida"),
+});
+
 export const messageParamsSchema = z.object({
   chatId: z.uuid("Sala inválida"),
   messageId: z.string().regex(/^[0-9a-f]{24}$/i, "Mensagem inválida"),

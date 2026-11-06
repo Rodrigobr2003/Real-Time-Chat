@@ -62,6 +62,11 @@ router.delete(
   requireAuth,
   controller.deleteMessage,
 );
+router.patch(
+  "/:chatId/messages/:messageId/reactions",
+  requireAuth,
+  controller.reactToMessage,
+);
 
 export default (app: Application, versionPrefix: string) =>
   app.use(`${versionPrefix}chats/private`, router);

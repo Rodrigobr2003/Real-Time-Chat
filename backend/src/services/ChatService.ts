@@ -33,6 +33,7 @@ import type {
   ListMessagesInput,
   MessageDefaultInput,
   MessageEditInput,
+  MessageReactionInput,
   MessageTargetInput,
   PublicMessage,
   SystemEvent,
@@ -518,6 +519,20 @@ export class ChatService {
     }
 
     this.realtime.publish(input.chatId, { type: "message:deleted", message });
+
+    return message;
+  }
+
+  async reactToMessage(
+    input: MessageReactionInput,
+  ): Promise<PublicMessage | null> {
+    await this.isUserConnected(input);
+
+    const message = await this.messageRespository.reactToMessage(input);
+
+    if (!message) return null;
+
+    this.realtime.publish(input.chatId, { type: "message:reacted", message });
 
     return message;
   }

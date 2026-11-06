@@ -5,12 +5,15 @@ import type {
   ListMessagesInput,
   MessageDefaultInput,
   MessageDoc,
+  MessageOwnerDoc,
   MessageEditInput,
+  MessageReactionInput,
   MessageTargetInput,
   PublicMessage,
   SystemMessageInput,
 } from "@typings/message";
-import { toPublicMessage } from "@utils/serviceResponse";
+import { UserModel } from "@models/userSchema";
+import { toMessageOwner, toPublicMessage } from "@utils/serviceResponse";
 
 const OWNER_FIELDS = "name user userPhoto profileBgColor";
 const DUPLICATE_KEY_ERROR = 11000;
@@ -43,15 +46,38 @@ export interface IMessageRepository {
   delete(input: MessageTargetInput): Promise<PublicMessage | null>;
   list(input: ListMessagesInput): Promise<PublicMessage[]>;
   findLatestByChats(chatIds: string[]): Promise<PublicMessage[]>;
+  reactToMessage(input: MessageReactionInput): Promise<PublicMessage | null>;
 }
 
 export class MessageRepository implements IMessageRepository {
+  private async toPublicWithReactors(docs: MessageDoc[]) {
+    const ids = [
+      ...new Set(docs.flatMap((doc) => Object.keys(doc.reactions ?? {}))),
+    ];
+
+    const users = ids.length
+      ? await UserModel.find({ _id: { $in: ids } })
+          .select(OWNER_FIELDS)
+          .lean<MessageOwnerDoc[]>()
+      : [];
+
+    const reactors = new Map(
+      users.map((user) => [user._id.toString(), toMessageOwner(user)]),
+    );
+
+    return docs.map((doc) => toPublicMessage(doc, reactors));
+  }
+
   private async findPublic(messageId: string) {
     const doc = await ChatMessageModel.findById(messageId)
       .populate<{ owner: MessageDoc["owner"] }>("owner", OWNER_FIELDS)
       .lean<MessageDoc>();
 
-    return doc && toPublicMessage(doc);
+    if (!doc) return null;
+
+    const [message] = await this.toPublicWithReactors([doc]);
+
+    return message;
   }
 
   async create({
@@ -86,7 +112,9 @@ export class MessageRepository implements IMessageRepository {
         throw new ConflictError("Identificador de mensagem já utilizado");
       }
 
-      return { message: toPublicMessage(existing), created: false };
+      const [message] = await this.toPublicWithReactors([existing]);
+
+      return { message, created: false };
     }
   }
 
@@ -134,6 +162,38 @@ export class MessageRepository implements IMessageRepository {
     return matchedCount > 0 ? this.findPublic(messageId) : null;
   }
 
+  async reactToMessage({
+    chatId,
+    messageId,
+    userId,
+    emoji,
+  }: MessageReactionInput) {
+    const filter = {
+      _id: messageId,
+      chatId,
+      kind: { $ne: "system" as const },
+      deletedAt: null,
+    };
+
+    const doc = await ChatMessageModel.findOne(filter)
+      .select("reactions")
+      .lean();
+
+    if (!doc) return null;
+
+    const field = `reactions.${userId}`;
+    const isSameReaction = doc.reactions?.[userId] === emoji;
+
+    await ChatMessageModel.updateOne(
+      filter,
+      isSameReaction
+        ? { $unset: { [field]: "" } }
+        : { $set: { [field]: emoji } },
+    );
+
+    return this.findPublic(messageId);
+  }
+
   async list({ chatId, before, limit }: ListMessagesInput) {
     const docs = await ChatMessageModel.find({
       chatId,
@@ -144,7 +204,7 @@ export class MessageRepository implements IMessageRepository {
       .populate<{ owner: MessageDoc["owner"] }>("owner", OWNER_FIELDS)
       .lean<MessageDoc[]>();
 
-    return docs.reverse().map(toPublicMessage);
+    return this.toPublicWithReactors(docs.reverse());
   }
 
   async findLatestByChats(chatIds: string[]) {
@@ -168,6 +228,6 @@ export class MessageRepository implements IMessageRepository {
       select: OWNER_FIELDS,
     });
 
-    return docs.map(toPublicMessage);
+    return docs.map((doc) => toPublicMessage(doc));
   }
 }
