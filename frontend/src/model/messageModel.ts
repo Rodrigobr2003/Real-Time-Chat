@@ -1,3 +1,4 @@
+import type { AttachmentKind } from "../utils/attachments";
 import type { RoomTarget } from "./realtimeModel";
 import type { ChatChange } from "./systemMessageModel";
 
@@ -15,6 +16,8 @@ export interface IMessageOwner {
 export type MessageStatus = "sent" | "pending" | "failed";
 
 export type MessageKind = "user" | "system";
+
+export type MessageType = "text" | "attachment";
 
 export type IMessageSystemEvent =
   | { type: "chat:updated"; changes: ChatChange[] }
@@ -35,13 +38,25 @@ export interface IMessageReaction {
   user: IMessageOwner;
 }
 
+export interface IMessageAttachment {
+  id: string;
+  kind: AttachmentKind;
+  name: string;
+  extension: string;
+  size: number;
+  mimeType: string;
+  url: string | null;
+}
+
 interface IBaseMessage {
   id: string;
   chatId: string;
   owner: IMessageOwner;
+  type: MessageType;
   content: string;
   clientMessageId: string | null;
   reactions: IMessageReaction[];
+  attachments: IMessageAttachment[];
   editedAt: string | null;
   deletedAt: string | null;
   createdAt: string;
@@ -59,4 +74,7 @@ export interface ISystemChatMessage extends IBaseMessage {
 
 export type IMessage = IUserMessage | ISystemChatMessage;
 
-export type IChatMessage = IMessage & { status: MessageStatus };
+export type IChatMessage = IMessage & {
+  status: MessageStatus;
+  error?: string;
+};

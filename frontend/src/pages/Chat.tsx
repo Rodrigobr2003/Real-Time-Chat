@@ -331,11 +331,11 @@ function handleRoomEvent(event: ServerEvent) {
     },
   });
 
-  function handleSend() {
+  function handleSend(files: File[]) {
     const content = text.trim();
-    if (!content) return;
+    if (!content && files.length === 0) return;
 
-    send(content);
+    send(content, files);
     setText("");
   }
 

@@ -29,6 +29,7 @@ import type {
 import { compressPhoto } from "@utils/image";
 import type { IMessageRepository } from "@repositories/MessageRepository";
 import type {
+  AttachmentTargetInput,
   CreateMessageResult,
   ListMessagesInput,
   MessageDefaultInput,
@@ -39,6 +40,11 @@ import type {
   SystemEvent,
 } from "@typings/message";
 import type { RoomChange } from "@typings/realtime";
+import type {
+  AttachmentDownload,
+  AttachmentService,
+  UploadedFile,
+} from "./AttachmentService";
 import { IRealtimePublisher } from "./RealtimeHub";
 
 const MAX_PUNISHMENT_DURATION_MS = PUNISHMENT_DURATIONS_MS.at(-1)!;
@@ -86,6 +92,7 @@ export class ChatService {
     private readonly punishmentRepository: IPunishmentRepository,
     private readonly messageRespository: IMessageRepository,
     private readonly realtime: IRealtimePublisher,
+    private readonly attachmentService: AttachmentService,
   ) {}
 
   private async assertIsAdmin(input: ChatDefaultInput) {
@@ -456,6 +463,29 @@ export class ChatService {
     return this.messageRespository.list(input);
   }
 
+  private publishCreated(
+    result: CreateMessageResult,
+    chatId: string,
+    privacy: string,
+  ) {
+    if (result.created) {
+      this.realtime.publish(chatId, {
+        type: "message:created",
+        message: result.message,
+      });
+
+      if (privacy === "public") {
+        this.realtime.publishToList({
+          type: "room:lastMessage",
+          chatId,
+          message: result.message,
+        });
+      }
+    }
+
+    return result;
+  }
+
   async sendMessage(
     input: MessageDefaultInput,
   ): Promise<CreateMessageResult | null> {
@@ -465,24 +495,60 @@ export class ChatService {
 
     await this.isUserConnected(input);
 
-    const result = await this.messageRespository.create(input);
+    const result = await this.messageRespository.create({
+      ...input,
+      attachments: [],
+    });
 
-    if (result.created) {
-      this.realtime.publish(input.chatId, {
-        type: "message:created",
-        message: result.message,
-      });
+    return this.publishCreated(result, input.chatId, privacy);
+  }
 
-      if (privacy === "public") {
-        this.realtime.publishToList({
-          type: "room:lastMessage",
-          chatId: input.chatId,
-          message: result.message,
-        });
-      }
+  async assertCanSend(input: ChatDefaultInput): Promise<boolean> {
+    if (!(await this.chatRepository.exists(input.chatId))) return false;
+
+    await this.isUserConnected(input);
+
+    return true;
+  }
+
+  async sendAttachmentMessage(
+    input: MessageDefaultInput,
+    files: UploadedFile[],
+  ): Promise<CreateMessageResult | null> {
+    const privacy = await this.chatRepository.findPrivacy(input.chatId);
+
+    if (!privacy) return null;
+
+    await this.isUserConnected(input);
+
+    const prepared = await this.attachmentService.prepare(files, input.userId);
+    const attachments = await this.attachmentService.store(prepared, input);
+    const fileIds = attachments.map(({ fileId }) => fileId);
+
+    let result: CreateMessageResult;
+
+    try {
+      result = await this.messageRespository.create({ ...input, attachments });
+    } catch (err) {
+      await this.attachmentService.discard(fileIds);
+      throw err;
     }
 
-    return result;
+    if (!result.created) await this.attachmentService.discard(fileIds);
+
+    return this.publishCreated(result, input.chatId, privacy);
+  }
+
+  async openAttachment(
+    input: AttachmentTargetInput,
+  ): Promise<AttachmentDownload | null> {
+    if (!(await this.chatRepository.exists(input.chatId))) return null;
+
+    await this.isUserConnected(input);
+
+    const attachment = await this.messageRespository.findAttachment(input);
+
+    return attachment && this.attachmentService.open(attachment);
   }
 
   async editMessage(input: MessageEditInput): Promise<PublicMessage | null> {
@@ -512,11 +578,15 @@ export class ChatService {
 
     if (!(await this.assertCanChangeMessage(input))) return null;
 
-    const message = await this.messageRespository.delete(input);
+    const deleted = await this.messageRespository.delete(input);
 
-    if (!message) {
+    if (!deleted) {
       throw new Error("Mensagem inexistente");
     }
+
+    const { message, fileIds } = deleted;
+
+    await this.attachmentService.discard(fileIds);
 
     this.realtime.publish(input.chatId, { type: "message:deleted", message });
 

@@ -1,7 +1,11 @@
 import { ConflictError } from "@errors/ConflictError";
 import { ChatMessageModel } from "@models/chatMessages";
+import { Types } from "mongoose";
 import type {
+  AttachmentDoc,
+  AttachmentTargetInput,
   CreateMessageResult,
+  DeletedMessageResult,
   ListMessagesInput,
   MessageDefaultInput,
   MessageDoc,
@@ -43,7 +47,9 @@ export interface IMessageRepository {
     input: Omit<MessageTargetInput, "userId">,
   ): Promise<{ owner: string; deletedAt: Date | null } | null>;
   update(input: MessageEditInput): Promise<PublicMessage | null>;
-  delete(input: MessageTargetInput): Promise<PublicMessage | null>;
+  delete(input: MessageTargetInput): Promise<DeletedMessageResult | null>;
+  findAttachment(input: AttachmentTargetInput): Promise<AttachmentDoc | null>;
+  sumStoredSizeByOwner(userId: string): Promise<number>;
   list(input: ListMessagesInput): Promise<PublicMessage[]>;
   findLatestByChats(chatIds: string[]): Promise<PublicMessage[]>;
   reactToMessage(input: MessageReactionInput): Promise<PublicMessage | null>;
@@ -85,12 +91,15 @@ export class MessageRepository implements IMessageRepository {
     userId,
     content,
     clientMessageId,
+    attachments = [],
   }: MessageDefaultInput) {
     try {
       const doc = await ChatMessageModel.create({
         chatId,
         owner: userId,
-        content,
+        type: attachments.length ? "attachment" : "text",
+        content: content || undefined,
+        attachments,
         clientMessageId,
       });
 
@@ -154,12 +163,58 @@ export class MessageRepository implements IMessageRepository {
   }
 
   async delete({ chatId, userId, messageId }: MessageTargetInput) {
-    const { matchedCount } = await ChatMessageModel.updateOne(
+    const previous = await ChatMessageModel.findOneAndUpdate(
       { ...userMessageFilter(messageId, chatId, userId) },
-      { $set: { deletedAt: new Date() } },
-    );
+      { $set: { deletedAt: new Date(), attachments: [] } },
+      { projection: { "attachments.fileId": 1 }, returnDocument: "before" },
+    ).lean();
 
-    return matchedCount > 0 ? this.findPublic(messageId) : null;
+    if (!previous) return null;
+
+    const message = await this.findPublic(messageId);
+
+    return (
+      message && {
+        message,
+        fileIds: (previous.attachments ?? []).map(({ fileId }) =>
+          fileId.toString(),
+        ),
+      }
+    );
+  }
+
+  async findAttachment({
+    chatId,
+    messageId,
+    attachmentId,
+  }: AttachmentTargetInput) {
+    const doc = await ChatMessageModel.findOne(
+      {
+        _id: messageId,
+        chatId,
+        deletedAt: null,
+        "attachments._id": attachmentId,
+      },
+      { "attachments.$": 1 },
+    ).lean<{ attachments: AttachmentDoc[] }>();
+
+    return doc?.attachments[0] ?? null;
+  }
+
+  async sumStoredSizeByOwner(userId: string) {
+    const [result] = await ChatMessageModel.aggregate<{ total: number }>([
+      {
+        $match: {
+          owner: new Types.ObjectId(userId),
+          type: "attachment",
+          deletedAt: null,
+        },
+      },
+      { $unwind: "$attachments" },
+      { $group: { _id: null, total: { $sum: "$attachments.storedSize" } } },
+    ]);
+
+    return result?.total ?? 0;
   }
 
   async reactToMessage({

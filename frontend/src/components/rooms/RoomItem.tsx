@@ -129,7 +129,9 @@ export function RoomItem({ room, onClick }: RoomItemProps) {
         <p onMouseEnter={showTitleIfTruncated}>
           {room.lastMessage && (
             <>
-              <b>{room.lastMessage.owner.name}:</b> {room.lastMessage.content}
+              <b>{room.lastMessage.owner.name}:</b>{" "}
+              {room.lastMessage.content ||
+                (room.lastMessage.attachments?.length ? "📎 Anexo" : "")}
             </>
           )}
         </p>

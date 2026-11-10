@@ -1,7 +1,39 @@
+import type {
+  AttachmentCompression,
+  AttachmentKind,
+} from "@config/attachments";
 import type { ChatDefaultInput, ConnectedUserDoc } from "./chat";
 import type { RoomChange, RoomTarget } from "./realtime";
 
 export type MessageKind = "user" | "system";
+
+export type MessageType = "text" | "attachment";
+
+export interface StoredAttachment {
+  fileId: string;
+  kind: AttachmentKind;
+  name: string;
+  extension: string;
+  mimeType: string;
+  size: number;
+  storedSize: number;
+  compression: AttachmentCompression;
+}
+
+export interface AttachmentDoc extends Omit<StoredAttachment, "fileId"> {
+  _id: { toString(): string };
+  fileId: { toString(): string };
+}
+
+export interface PublicAttachment {
+  id: string;
+  kind: AttachmentKind;
+  name: string;
+  extension: string;
+  mimeType: string;
+  size: number;
+  url: string;
+}
 
 export type SystemEvent =
   | { type: "chat:updated"; changes: RoomChange[] }
@@ -18,8 +50,18 @@ export type SystemEvent =
   | { type: "user:kicked"; target: RoomTarget; expiresAt: Date | null };
 
 export interface MessageDefaultInput extends ChatDefaultInput {
-  content: string;
+  content?: string;
   clientMessageId?: string;
+  attachments?: StoredAttachment[];
+}
+
+export interface AttachmentTargetInput extends MessageTargetInput {
+  attachmentId: string;
+}
+
+export interface DeletedMessageResult {
+  message: PublicMessage;
+  fileIds: string[];
 }
 
 export interface CreateMessageResult {
@@ -55,7 +97,9 @@ export type MessageDoc = {
   chatId: string;
   owner: MessageOwnerDoc;
   kind?: MessageKind | null;
+  type?: MessageType | null;
   content?: string | null;
+  attachments?: AttachmentDoc[] | null;
   system?: SystemEvent | null;
   reactions?: Record<string, string> | null;
   clientMessageId?: string | null;
@@ -81,7 +125,9 @@ interface BaseMessage {
   id: string;
   chatId: string;
   owner: MessageOwner;
+  type: MessageType;
   content: string;
+  attachments: PublicAttachment[];
   clientMessageId: string | null;
   reactions: MessageReaction[];
   editedAt: Date | null;

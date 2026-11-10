@@ -1,25 +1,36 @@
 import { Router, type Application } from "express";
+import { AttachmentController } from "@controllers/AttachmentController";
 import { ChatController } from "@controllers/ChatController";
 import { requireAuth } from "@middlewares/requireAuth";
+import { uploadAttachments } from "@middlewares/uploadAttachments";
 import { uploadChatPhoto } from "@middlewares/uploadPhoto";
+import { GridFSAttachmentStorageRepository } from "@repositories/AttachmentStorageRepository";
 import { MongoChatRepository } from "@repositories/ChatRepository";
 import { MongoPunishmentRepository } from "@repositories/PunishmentRepository";
 import { ChatService } from "@services/ChatService";
 import { MessageRepository } from "@repositories/MessageRepository";
+import { AttachmentService } from "@services/AttachmentService";
 import { realtimeHub } from "@services/RealtimeHub";
 
 const repository = new MongoChatRepository();
 const punishmentRepository = new MongoPunishmentRepository();
 const messageRepository = new MessageRepository();
+const attachmentStorage = new GridFSAttachmentStorageRepository();
+const attachmentService = new AttachmentService(
+  attachmentStorage,
+  messageRepository,
+);
 
 const service = new ChatService(
   repository,
   punishmentRepository,
   messageRepository,
   realtimeHub,
+  attachmentService,
 );
 
 const controller = new ChatController(service);
+const attachmentController = new AttachmentController(service);
 
 const router = Router();
 
@@ -52,6 +63,18 @@ router.patch(
 
 router.get("/:chatId/messages", requireAuth, controller.listMessages);
 router.post("/:chatId/messages", requireAuth, controller.sendMessage);
+router.post(
+  "/:chatId/messages/attachments",
+  requireAuth,
+  attachmentController.authorize,
+  uploadAttachments,
+  attachmentController.send,
+);
+router.get(
+  "/:chatId/messages/:messageId/attachments/:attachmentId",
+  requireAuth,
+  attachmentController.download,
+);
 router.patch(
   "/:chatId/messages/:messageId",
   requireAuth,

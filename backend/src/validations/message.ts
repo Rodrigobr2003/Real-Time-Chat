@@ -48,3 +48,20 @@ export const listMessagesSchema = z.object({
     .max(MESSAGE_LIST_MAX_LIMIT)
     .default(MESSAGE_LIST_DEFAULT_LIMIT),
 });
+
+export const attachmentMessageBodySchema = z.object({
+  content: z
+    .string()
+    .trim()
+    .max(
+      MESSAGE_MAX_LENGTH,
+      `A legenda deve ter no máximo ${MESSAGE_MAX_LENGTH} caracteres`,
+    )
+    .optional()
+    .transform((value) => value || undefined),
+  clientMessageId: z.uuid("Identificador da mensagem inválido"),
+});
+
+export const attachmentParamsSchema = messageParamsSchema.extend({
+  attachmentId: z.string().regex(/^[0-9a-f]{24}$/i, "Anexo inválido"),
+});

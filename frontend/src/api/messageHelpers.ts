@@ -28,6 +28,32 @@ export const sendMessage = async (
   return data;
 };
 
+export const sendAttachmentMessage = async (
+  chatId: string,
+  files: File[],
+  content: string,
+  clientMessageId: string,
+) => {
+  const form = new FormData();
+
+  form.append("clientMessageId", clientMessageId);
+  if (content) form.append("content", content);
+  files.forEach((file) => form.append("attachments", file, file.name));
+
+  const { data } = await api.post<IMessage>(
+    `${messagesPath(chatId)}/attachments`,
+    form,
+  );
+
+  return data;
+};
+
+export const downloadAttachment = async (url: string) => {
+  const { data } = await api.get<Blob>(url, { responseType: "blob" });
+
+  return data;
+};
+
 export const editMessage = async (
   chatId: string,
   messageId: string,

@@ -14,6 +14,7 @@ import { useAuth } from "../../hooks/useAuth";
 import type { IChatMessage } from "../../model/messageModel";
 import { Avatar } from "../ui/Avatar";
 import { EmojiPickerButton } from "./EmojiPickerButton";
+import { MessageAttachment } from "./MessageAttachment";
 import { MessageReactions } from "./MessageReactions";
 
 type MessageAction = (message: IChatMessage) => void;
@@ -152,6 +153,13 @@ const Author = styled.strong`
   padding-right: 20px;
   font-size: 13px;
   color: ${({ theme }) => theme.colors.primary};
+`;
+
+const Attachments = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 2px 0 4px;
 `;
 
 const Deleted = styled.span`
@@ -307,13 +315,26 @@ export function MessageBubble({
             Mensagem apagada
           </Deleted>
         ) : (
-          message.content
+          <>
+            {!!message.attachments?.length && (
+              <Attachments>
+                {message.attachments.map((attachment) => (
+                  <MessageAttachment
+                    key={attachment.id}
+                    attachment={attachment}
+                    mine={mine}
+                  />
+                ))}
+              </Attachments>
+            )}
+            {message.content}
+          </>
         )}
         <Meta>
           {isFailed && (
             <FailedNotice>
               <AlertCircle size={12} />
-              Não enviada
+              {message.error ?? "Não enviada"}
             </FailedNotice>
           )}
           {message.editedAt && !isDeleted && <EditedLabel>Editada</EditedLabel>}

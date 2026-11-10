@@ -66,15 +66,34 @@ export const toMessageOwner = (doc: MessageOwnerDoc): MessageOwner => ({
   profileBgColor: doc.profileBgColor ?? USER_BACKGROUND_COLOR[0],
 });
 
+export const toAttachmentURL = (
+  chatId: string,
+  messageId: string,
+  attachmentId: string,
+) => `/chats/private/${chatId}/messages/${messageId}/attachments/${attachmentId}`;
+
 export const toPublicMessage = (
   doc: MessageDoc,
   reactors: Map<string, MessageOwner> = new Map(),
 ): PublicMessage => {
+  const id = doc._id.toString();
   const base = {
-    id: doc._id.toString(),
+    id,
     chatId: doc.chatId,
     owner: toMessageOwner(doc.owner),
+    type: doc.type ?? "text",
     content: doc.deletedAt ? "" : (doc.content ?? ""),
+    attachments: doc.deletedAt
+      ? []
+      : (doc.attachments ?? []).map((attachment) => ({
+          id: attachment._id.toString(),
+          kind: attachment.kind,
+          name: attachment.name,
+          extension: attachment.extension,
+          mimeType: attachment.mimeType,
+          size: attachment.size,
+          url: toAttachmentURL(doc.chatId, id, attachment._id.toString()),
+        })),
     clientMessageId: doc.clientMessageId ?? null,
     reactions: Object.entries(doc.reactions ?? {}).flatMap(([id, emoji]) => {
       const user = reactors.get(id);
