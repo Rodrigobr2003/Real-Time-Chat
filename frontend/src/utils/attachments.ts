@@ -41,7 +41,7 @@ export const ATTACHMENT_SECTIONS: AttachmentSection[] = [
     label: "Áudio",
     icon: Headphones,
     color: "#e17055",
-    extensions: ["mp3", "wav", "ogg", "m4a"],
+    extensions: ["mp3", "wav", "ogg", "m4a", "weba"],
     maxSize: 16 * MB,
   },
   {
@@ -76,3 +76,6 @@ export const formatFileSize = (bytes: number) => {
 
   return `${size.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ${units[unit]}`;
 };
+
+export const formatDuration = (total: number) =>
+  `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;

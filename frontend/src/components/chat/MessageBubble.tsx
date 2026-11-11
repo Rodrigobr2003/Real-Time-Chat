@@ -15,6 +15,7 @@ import type { IChatMessage } from "../../model/messageModel";
 import { Avatar } from "../ui/Avatar";
 import { EmojiPickerButton } from "./EmojiPickerButton";
 import { MessageAttachment } from "./MessageAttachment";
+import { VoiceMessage } from "./VoiceMessage";
 import { MessageReactions } from "./MessageReactions";
 
 type MessageAction = (message: IChatMessage) => void;
@@ -318,13 +319,21 @@ export function MessageBubble({
           <>
             {!!message.attachments?.length && (
               <Attachments>
-                {message.attachments.map((attachment) => (
-                  <MessageAttachment
-                    key={attachment.id}
-                    attachment={attachment}
-                    mine={mine}
-                  />
-                ))}
+                {message.attachments.map((attachment) =>
+                  attachment.kind === "audio" ? (
+                    <VoiceMessage
+                      key={attachment.id}
+                      attachment={attachment}
+                      mine={mine}
+                    />
+                  ) : (
+                    <MessageAttachment
+                      key={attachment.id}
+                      attachment={attachment}
+                      mine={mine}
+                    />
+                  ),
+                )}
               </Attachments>
             )}
             {message.content}

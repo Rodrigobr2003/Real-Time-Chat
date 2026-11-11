@@ -1,16 +1,21 @@
-import { SendHorizontal } from "lucide-react";
-import { useRef, useState, type FormEvent } from "react";
+import { Mic, SendHorizontal } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import styled from "styled-components";
+import {
+  RECORDING_MAX_SECONDS,
+  useAudioRecorder,
+} from "../../hooks/useAudioRecorder";
 import { MESSAGE_MAX_LENGTH } from "../../model/messageModel";
 import type { AttachmentKind } from "../../utils/attachments";
 import { AttachmentButton } from "./AttachmentButton";
 import { EmojiPickerButton } from "./EmojiPickerButton";
 import { PendingAttachments } from "./PendingAttachments";
+import { VoiceRecorderBar } from "./VoiceRecorderBar";
 
 type MessageInputProps = {
   value: string;
   onChange: (value: string) => void;
-  onSend: (files: File[]) => void;
+  onSend: (files: File[], options: { voice: boolean }) => void;
   onAttach?: (files: File[], kind: AttachmentKind) => void;
   disabled?: boolean;
 };
@@ -73,10 +78,38 @@ const InputEmoji = styled(EmojiPickerButton)`
   }
 `;
 
+const MicButton = styled.button`
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin: auto 0;
+  border-radius: ${({ theme }) => theme.radius.full};
+  color: ${({ theme }) => theme.colors.textMuted};
+  transition:
+    color 0.2s,
+    background 0.2s;
+
+  &:hover:not(:disabled) {
+    color: ${({ theme }) => theme.colors.text};
+    background: ${({ theme }) => theme.colors.surface};
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
 const Field = styled.input`
   width: 100%;
   height: 44px;
-  padding: 0 16px 0 80px;
+  padding: 0 46px 0 80px;
   border-radius: ${({ theme }) => theme.radius.full};
   border: 1px solid ${({ theme }) => theme.colors.border};
   background: ${({ theme }) => theme.colors.surfaceAlt};
@@ -125,6 +158,52 @@ export function MessageInput({
   const fieldRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [attachError, setAttachError] = useState("");
+  const recorder = useAudioRecorder();
+  const [audio, setAudio] = useState<{ file: File; seconds: number } | null>(
+    null,
+  );
+  const isRecording = recorder.status !== "idle";
+  const isVoiceMode = isRecording || !!audio;
+  const canSend = isVoiceMode || !!value.trim() || files.length > 0;
+
+  async function startRecording() {
+    setAttachError("");
+
+    try {
+      await recorder.start();
+    } catch (err) {
+      setAttachError(
+        err instanceof Error ? err.message : "Não foi possível gravar o áudio",
+      );
+    }
+  }
+
+  async function finishRecording() {
+    const seconds = recorder.seconds;
+    const file = await recorder.stop();
+
+    if (!file) {
+      setAttachError("Nenhum áudio foi gravado");
+      return null;
+    }
+
+    const recorded = { file, seconds };
+    setAudio(recorded);
+    return recorded;
+  }
+
+  function discardAudio() {
+    recorder.cancel();
+    setAudio(null);
+  }
+
+  useEffect(() => {
+    if (recorder.seconds < RECORDING_MAX_SECONDS) return;
+
+    recorder.stop().then((file) => {
+      if (file) setAudio({ file, seconds: RECORDING_MAX_SECONDS });
+    });
+  }, [recorder]);
 
   function attach(selected: File[], kind: AttachmentKind) {
     setAttachError("");
@@ -141,11 +220,22 @@ export function MessageInput({
     setFiles((current) => current.filter((item) => item !== file));
   }
 
-  function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if ((!value.trim() && files.length === 0) || disabled) return;
+    if (!canSend || disabled) return;
 
-    onSend(files);
+    if (isVoiceMode) {
+      const recorded = isRecording ? await finishRecording() : audio;
+
+      if (!recorded) return;
+
+      onSend([recorded.file], { voice: true });
+      setAudio(null);
+      setAttachError("");
+      return;
+    }
+
+    onSend(files, { voice: false });
     setFiles([]);
     setAttachError("");
   }
@@ -168,27 +258,56 @@ export function MessageInput({
 
   return (
     <Bar onSubmit={handleSubmit}>
-      {files.length > 0 && (
+      {!isVoiceMode && files.length > 0 && (
         <PendingAttachments files={files} onRemove={removeFile} />
       )}
       {attachError && <AttachError role="alert">{attachError}</AttachError>}
       <Controls>
         <FieldBox>
-          <Field
-            ref={fieldRef}
-            placeholder="Digite uma mensagem..."
-            value={value}
-            maxLength={MESSAGE_MAX_LENGTH}
-            onChange={(event) => onChange(event.target.value)}
-          />
-          <InputAttachment
-            onSelect={attach}
-            onReject={setAttachError}
-            disabled={disabled}
-          />
-          <InputEmoji onSelect={insertEmoji} disabled={disabled} />
+          {isVoiceMode ? (
+            <VoiceRecorderBar
+              status={recorder.status}
+              seconds={audio?.seconds ?? recorder.seconds}
+              stream={recorder.stream}
+              getPreview={recorder.snapshot}
+              audio={audio?.file ?? null}
+              onPause={recorder.pause}
+              onResume={recorder.resume}
+              onStop={finishRecording}
+              onDiscard={discardAudio}
+            />
+          ) : (
+            <>
+              <Field
+                ref={fieldRef}
+                placeholder="Digite uma mensagem..."
+                value={value}
+                maxLength={MESSAGE_MAX_LENGTH}
+                onChange={(event) => onChange(event.target.value)}
+              />
+              <InputAttachment
+                onSelect={attach}
+                onReject={setAttachError}
+                disabled={disabled}
+              />
+              <InputEmoji onSelect={insertEmoji} disabled={disabled} />
+              <MicButton
+                type="button"
+                onClick={startRecording}
+                disabled={disabled}
+                aria-label="Gravar áudio"
+                title="Gravar áudio"
+              >
+                <Mic size={20} />
+              </MicButton>
+            </>
+          )}
         </FieldBox>
-        <SendButton type="submit" disabled={(!value.trim() && files.length === 0) || disabled} aria-label="Enviar">
+        <SendButton
+          type="submit"
+          disabled={!canSend || disabled}
+          aria-label="Enviar"
+        >
           <SendHorizontal size={20} />
         </SendButton>
       </Controls>

@@ -140,7 +140,8 @@ export default function Chat() {
     hasNextPage,
     isFetchingNextPage,
   } = useMessages(roomId, isConnected, handleRoomEvent);
-function handleRoomEvent(event: ServerEvent) {
+
+  function handleRoomEvent(event: ServerEvent) {
     switch (event.type) {
       case "room:updated": {
         const { chat } = event;
@@ -331,7 +332,12 @@ function handleRoomEvent(event: ServerEvent) {
     },
   });
 
-  function handleSend(files: File[]) {
+  function handleSend(files: File[], { voice }: { voice: boolean }) {
+    if (voice) {
+      send("", files);
+      return;
+    }
+
     const content = text.trim();
     if (!content && files.length === 0) return;
 

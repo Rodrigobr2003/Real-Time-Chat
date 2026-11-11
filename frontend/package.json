@@ -23,6 +23,7 @@
     "react-router-dom": "^7.18.4",
     "react-use-websocket": "^4.13.0",
     "styled-components": "^6.5.3",
+    "wavesurfer.js": "^8.0.5",
     "zod": "^4.6.5",
     "zustand": "^5.0.15"
   },
