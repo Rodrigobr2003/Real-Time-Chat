@@ -9,11 +9,8 @@ import {
   REFRESH_TOKEN_MAX_AGE_MS,
   refreshCookieOptions,
 } from "@utils/refreshToken";
-
-const loginSchema = z.object({
-  userOrEmail: z.string().trim().min(1, "Informe o usuário ou e-mail"),
-  password: z.string().min(1, "Informe a senha"),
-});
+import { ConflictError } from "@errors/ConflictError";
+import { googleLoginSchema, loginSchema } from "@validations/auth";
 
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -36,6 +33,37 @@ export class AuthController {
     } catch (err) {
       if (err instanceof UnauthorizedError) {
         return res.status(401).json({ message: err.message });
+      }
+
+      console.error(err);
+      return res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  };
+
+  googleLogin = async (req: Request, res: Response) => {
+    const parsed = googleLoginSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ errors: z.flattenError(parsed.error).fieldErrors });
+    }
+
+    try {
+      const { user, ...session } = await this.authService.loginWithGoogle(
+        parsed.data.credential,
+      );
+
+      this.setAuthCookies(res, session);
+
+      return res.status(200).json(user);
+    } catch (err) {
+      if (err instanceof UnauthorizedError) {
+        return res.status(401).json({ message: err.message });
+      }
+
+      if (err instanceof ConflictError) {
+        return res.status(409).json({ message: err.message });
       }
 
       console.error(err);

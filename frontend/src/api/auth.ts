@@ -18,6 +18,15 @@ export const manualLogin = async (loginDTO: ILoginDTO) => {
   return data;
 };
 
+export const googleLogin = async (credential: string) => {
+  const { data } = await api.post<IPublicUser>(
+    `${PUBLIC_AUTH_DEFAULT_PATH}/google`,
+    { credential },
+  );
+
+  return data;
+};
+
 export const getMe = async () => {
   const { data } = await api.get<IPublicUser>(
     `${PRIVATE_AUTH_DEFAULT_PATH}/me`,

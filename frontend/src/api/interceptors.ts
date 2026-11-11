@@ -4,6 +4,7 @@ import { refreshSession } from "./auth";
 
 const SKIP_REFRESH = [
   "/auth/public/login",
+  "/auth/public/google",
   "/auth/public/refresh",
   "/auth/private/logout",
 ];
@@ -11,6 +12,19 @@ const SKIP_REFRESH = [
 let refreshPromise: Promise<void> | null = null;
 
 type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
+
+export const refreshSessionOnce = async () => {
+  try {
+    refreshPromise ??= refreshSession().finally(() => {
+      refreshPromise = null;
+    });
+
+    await refreshPromise;
+  } catch (refreshError) {
+    window.dispatchEvent(new Event("auth:session-expired"));
+    throw refreshError;
+  }
+};
 
 export const setupAuthInterceptor = () => {
   api.interceptors.response.use(
@@ -29,13 +43,8 @@ export const setupAuthInterceptor = () => {
       original._retry = true;
 
       try {
-        refreshPromise ??= refreshSession().finally(() => {
-          refreshPromise = null;
-        });
-
-        await refreshPromise;
+        await refreshSessionOnce();
       } catch (refreshError) {
-        window.dispatchEvent(new Event("auth:session-expired"));
         return Promise.reject(refreshError);
       }
 

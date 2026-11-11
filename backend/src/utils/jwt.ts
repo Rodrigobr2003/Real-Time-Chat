@@ -17,10 +17,15 @@ export const signToken = (userId: string) => {
   });
 };
 
-export const verifyToken = (token: string): string => {
+export interface TokenSession {
+  userId: string;
+  expiresAt: number;
+}
+
+export const verifyTokenPayload = (token: string): TokenSession => {
   const payload = jwt.verify(token, SECRET) as jwt.JwtPayload;
 
-  return payload.sub as string;
+  return { userId: payload.sub as string, expiresAt: payload.exp! * 1000 };
 };
 
 export const TOKEN_COOKIE = "access_token";

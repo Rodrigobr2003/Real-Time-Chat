@@ -2,7 +2,6 @@ import type { Status } from "@models/userSchema";
 
 export type UserDoc = {
   _id: { toString(): string };
-  accountId: string;
   name: string;
   user: string;
   email: string;
@@ -39,7 +38,6 @@ export interface NewUser {
 
 export interface PublicUser {
   id: string;
-  accountId: string;
   name: string;
   user: string;
   email: string;

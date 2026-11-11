@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { Schema, model, type InferSchemaType } from "mongoose";
 
 export const USER_STATUS = ["online", "absent", "busy", "invisible"] as const;
@@ -27,13 +26,6 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const UserSchema = new Schema(
   {
-    accountId: {
-      type: String,
-      required: true,
-      unique: true,
-      immutable: true,
-      default: () => randomUUID(),
-    },
     name: {
       type: String,
       required: [true, "O nome é obrigatório"],
@@ -62,9 +54,20 @@ const UserSchema = new Schema(
       lowercase: true,
       match: [EMAIL_REGEX, "E-mail inválido"],
     },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      select: false,
+    },
     passwordHash: {
       type: String,
-      required: [true, "A senha é obrigatória"],
+      required: [
+        function (this: { googleId?: string }) {
+          return !this.googleId;
+        },
+        "A senha é obrigatória",
+      ],
       select: false,
     },
     description: {

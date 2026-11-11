@@ -1,19 +1,14 @@
 import { Search, X } from "lucide-react";
 import styled from "styled-components";
-
-export type VisibilityFilter = "all" | "public" | "private";
-export type PeopleFilter = "any" | "1-2" | "3-5" | "6-10" | "10+";
-
-export type Filters = {
-  search: string;
-  visibility: VisibilityFilter;
-  people: PeopleFilter;
-  onlyAvailable: boolean;
-};
+import type {
+  IChatFilters,
+  PeopleFilter,
+  VisibilityFilter,
+} from "../../model/chatModel";
 
 type RoomFiltersProps = {
-  filters: Filters;
-  onChange: (filters: Filters) => void;
+  filters: IChatFilters;
+  onChange: (filters: IChatFilters) => void;
 };
 
 const VISIBILITY_OPTIONS: { value: VisibilityFilter; label: string }[] = [
@@ -92,6 +87,14 @@ const Segmented = styled.div`
   border-radius: ${({ theme }) => theme.radius.full};
   background: ${({ theme }) => theme.colors.surfaceAlt};
   border: 1px solid ${({ theme }) => theme.colors.border};
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    flex: 1 1 100%;
+
+    > button {
+      flex: 1;
+    }
+  }
 `;
 
 const Segment = styled.button<{ $active: boolean }>`
@@ -107,6 +110,10 @@ const Segment = styled.button<{ $active: boolean }>`
 
   &:hover {
     color: ${({ $active, theme }) => ($active ? "#fff" : theme.colors.text)};
+  }
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    padding-block: 7px;
   }
 `;
 
@@ -141,7 +148,7 @@ const Chip = styled.button<{ $active: boolean }>`
 `;
 
 export function RoomFilters({ filters, onChange }: RoomFiltersProps) {
-  function update<K extends keyof Filters>(key: K, value: Filters[K]) {
+  function update<K extends keyof IChatFilters>(key: K, value: IChatFilters[K]) {
     onChange({ ...filters, [key]: value });
   }
 

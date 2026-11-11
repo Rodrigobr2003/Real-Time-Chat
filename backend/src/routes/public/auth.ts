@@ -13,6 +13,7 @@ const controller = new AuthController(service);
 const router = Router();
 
 router.post("/login", controller.login);
+router.post("/google", controller.googleLogin);
 router.post("/refresh", controller.refresh);
 
 export default (app: Application, versionPrefix: string) =>

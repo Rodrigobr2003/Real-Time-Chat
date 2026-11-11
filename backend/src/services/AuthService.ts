@@ -6,6 +6,9 @@ import type { PublicUser } from "@typings/user";
 import { parseLoginIdentifier } from "@utils/loginIdentifier";
 import { IRefreshTokenRepository } from "@repositories/RefreshTokenRepository";
 import { signToken } from "@utils/jwt";
+import { verifyGoogleCredential, type GoogleProfile } from "@utils/googleAuth";
+import { downloadPhoto } from "@utils/image";
+import { usernameFromEmail } from "@utils/username";
 import {
   generateRefreshToken,
   hashToken,
@@ -24,7 +27,7 @@ export class AuthService {
     const identifier = parseLoginIdentifier(input.userOrEmail);
     const found = await this.authRepository.findByIdentifier(identifier);
 
-    if (!found) throw new UnauthorizedError(INVALID_CREDENTIALS);
+    if (!found?.passwordHash) throw new UnauthorizedError(INVALID_CREDENTIALS);
 
     const passwordMatches = await verify(found.passwordHash, input.password);
 
@@ -97,5 +100,38 @@ export class AuthService {
     if (!user) throw new UnauthorizedError("Sessão inválida ou expirada");
 
     return user;
+  }
+
+  async loginWithGoogle(credential: string) {
+    const profile = await verifyGoogleCredential(credential);
+
+    const user =
+      (await this.authRepository.findByGoogleId(profile.googleId)) ??
+      (await this.authRepository.linkGoogleByEmail(
+        profile.email,
+        profile.googleId,
+      )) ??
+      (await this.createGoogleUser(profile));
+
+    const session = await this.createSession(user.id);
+
+    return { user, ...session };
+  }
+
+  private async createGoogleUser(profile: GoogleProfile) {
+    const base = usernameFromEmail(profile.email);
+    let user = base;
+
+    for (let i = 1; await this.authRepository.usernameExists(user); i++) {
+      user = `${base.slice(0, 30 - String(i).length)}${i}`;
+    }
+
+    return this.authRepository.createFromGoogle({
+      googleId: profile.googleId,
+      email: profile.email,
+      name: profile.name.slice(0, 60).padEnd(3, "_"),
+      user,
+      userPhoto: await downloadPhoto(profile.picture),
+    });
   }
 }

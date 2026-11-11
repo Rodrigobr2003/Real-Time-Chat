@@ -1,42 +1,18 @@
-import { MessagesSquare, Plus, SearchX } from "lucide-react";
+import { CloudOff, MessagesSquare, Plus, SearchX } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import styled from "styled-components";
-import { mockRooms, type Room } from "../../mocks/rooms";
+import { useChat } from "../../hooks/useChat";
+import { useChatList } from "../../hooks/useChatList";
+import type { IPublicChat, IPunishmentInfo } from "../../model/chatModel";
+import { getApiErrors, getPunishment } from "../../utils/apiErrors";
 import { Button } from "../ui/Button";
+import { FieldError } from "../ui/Input";
 import { CreateRoomModal } from "./CreateRoomModal";
-import { RoomFilters, type Filters } from "./RoomFilters";
+import { JoinPrivateRoomModal } from "./JoinPrivateRoomModal";
+import { PunishmentModal } from "./PunishmentModal";
+import { RoomFilters } from "./RoomFilters";
 import { RoomItem } from "./RoomItem";
-
-const INITIAL_FILTERS: Filters = {
-  search: "",
-  visibility: "all",
-  people: "any",
-  onlyAvailable: false,
-};
-
-function matchesFilters(room: Room, filters: Filters) {
-  const search = filters.search.trim().toLowerCase();
-  if (search && !room.name.toLowerCase().includes(search)) return false;
-
-  if (filters.visibility === "public" && room.isPrivate) return false;
-  if (filters.visibility === "private" && !room.isPrivate) return false;
-
-  if (filters.onlyAvailable && room.members >= room.maxMembers) return false;
-
-  switch (filters.people) {
-    case "1-2":
-      return room.members <= 2;
-    case "3-5":
-      return room.members >= 3 && room.members <= 5;
-    case "6-10":
-      return room.members >= 6 && room.members <= 10;
-    case "10+":
-      return room.members > 10;
-    default:
-      return true;
-  }
-}
 
 const Wrapper = styled.div`
   flex: 1;
@@ -90,51 +66,144 @@ const EmptyState = styled.div`
   text-align: center;
 `;
 
+const LoadMoreButton = styled(Button)`
+  align-self: center;
+  flex-shrink: 0;
+  height: 34px;
+  margin-top: 4px;
+  font-size: 13px;
+`;
+
 export function RoomsTab() {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
+  const {
+    filters,
+    setFilters,
+    resetFilters,
+    hasActiveFilters,
+    chats,
+    totalChats,
+    isListPending,
+    isListError,
+    refetchChats,
+    fetchNextChatsPage,
+    hasNextChatsPage,
+    isFetchingNextChatsPage,
+  } = useChatList();
+  const { connectChatMutation, isConnectPending } = useChat();
+  const locationState = useLocation().state as {
+    joinError?: string;
+    punishment?: IPunishmentInfo;
+    roomName?: string;
+  } | null;
+  const [joinError, setJoinError] = useState(
+    locationState?.punishment ? "" : (locationState?.joinError ?? ""),
+  );
+  const [punished, setPunished] = useState<{
+    punishment: IPunishmentInfo;
+    roomName?: string;
+  } | null>(
+    locationState?.punishment
+      ? {
+          punishment: locationState.punishment,
+          roomName: locationState.roomName,
+        }
+      : null,
+  );
+  const [privateRoom, setPrivateRoom] = useState<IPublicChat | null>(null);
 
-  const filteredRooms = mockRooms.filter((room) => matchesFilters(room, filters));
-  const hasActiveFilters = filteredRooms.length !== mockRooms.length;
+  function openRoom(room: IPublicChat) {
+    setJoinError("");
+
+    if (room.privacy === "private") return setPrivateRoom(room);
+    if (isConnectPending) return;
+
+    connectChatMutation(
+      { chatId: room.chatId },
+      {
+        onSuccess: (connection) =>
+          navigate(`/chat/${room.chatId}`, { state: { room, ...connection } }),
+        onError: (error) => {
+          const punishment = getPunishment(error);
+
+          if (punishment)
+            return setPunished({ punishment, roomName: room.name });
+
+          setJoinError(getApiErrors(error).message);
+        },
+      },
+    );
+  }
+
+  function renderRooms() {
+    if (isListPending) {
+      return <EmptyState aria-busy="true">Carregando salas...</EmptyState>;
+    }
+
+    if (isListError) {
+      return (
+        <EmptyState>
+          <CloudOff size={32} />
+          Não foi possível carregar as salas
+          <Button $variant="ghost" onClick={refetchChats}>
+            Tentar novamente
+          </Button>
+        </EmptyState>
+      );
+    }
+
+    if (chats.length === 0) {
+      return hasActiveFilters ? (
+        <EmptyState>
+          <SearchX size={32} />
+          Nenhuma sala encontrada com esses filtros
+          <Button $variant="ghost" onClick={resetFilters}>
+            Limpar filtros
+          </Button>
+        </EmptyState>
+      ) : (
+        <EmptyState>
+          <MessagesSquare size={32} />
+          Nenhuma sala criada ainda
+        </EmptyState>
+      );
+    }
+
+    return (
+      <>
+        {chats.map((room) => (
+          <RoomItem
+            key={room.chatId}
+            room={room}
+            onClick={() => openRoom(room)}
+          />
+        ))}
+        {hasNextChatsPage && (
+          <LoadMoreButton
+            $variant="ghost"
+            onClick={fetchNextChatsPage}
+            disabled={isFetchingNextChatsPage}
+          >
+            {isFetchingNextChatsPage ? "Carregando..." : "Carregar mais salas"}
+          </LoadMoreButton>
+        )}
+      </>
+    );
+  }
 
   return (
     <Wrapper>
       <SectionHeader>
         <h2>Salas de conversa</h2>
-        <CountBadge>
-          {hasActiveFilters
-            ? `${filteredRooms.length} de ${mockRooms.length}`
-            : mockRooms.length}
-        </CountBadge>
+        <CountBadge>{totalChats}</CountBadge>
       </SectionHeader>
 
       <RoomFilters filters={filters} onChange={setFilters} />
 
-      <RoomList>
-        {mockRooms.length === 0 ? (
-          <EmptyState>
-            <MessagesSquare size={32} />
-            Nenhuma sala criada ainda
-          </EmptyState>
-        ) : filteredRooms.length === 0 ? (
-          <EmptyState>
-            <SearchX size={32} />
-            Nenhuma sala encontrada com esses filtros
-            <Button $variant="ghost" onClick={() => setFilters(INITIAL_FILTERS)}>
-              Limpar filtros
-            </Button>
-          </EmptyState>
-        ) : (
-          filteredRooms.map((room) => (
-            <RoomItem
-              key={room.id}
-              room={room}
-              onClick={() => navigate(`/chat/${room.id}`)}
-            />
-          ))
-        )}
-      </RoomList>
+      {joinError && <FieldError role="alert">{joinError}</FieldError>}
+
+      <RoomList>{renderRooms()}</RoomList>
 
       <Button $fullWidth onClick={() => setIsModalOpen(true)}>
         <Plus size={18} />
@@ -144,7 +213,20 @@ export function RoomsTab() {
       <CreateRoomModal
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onCreate={() => setIsModalOpen(false)}
+      />
+
+      <JoinPrivateRoomModal
+        room={privateRoom}
+        onClose={() => setPrivateRoom(null)}
+        onPunished={(punishment, roomName) =>
+          setPunished({ punishment, roomName })
+        }
+      />
+
+      <PunishmentModal
+        punishment={punished?.punishment ?? null}
+        roomName={punished?.roomName}
+        onClose={() => setPunished(null)}
       />
     </Wrapper>
   );
