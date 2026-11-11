@@ -46,6 +46,7 @@ const SIGNATURES: Record<string, (buffer: Buffer) => boolean> = {
   mp4: isIsoMedia,
   mov: (b) => isIsoMedia(b) || ascii(b, "moov", 4) || ascii(b, "wide", 4),
   webm: (b) => startsWith(b, [0x1a, 0x45, 0xdf, 0xa3]),
+  weba: (b) => startsWith(b, [0x1a, 0x45, 0xdf, 0xa3]),
   pdf: (b) => ascii(b, "%PDF-"),
   doc: isOle,
   xls: isOle,

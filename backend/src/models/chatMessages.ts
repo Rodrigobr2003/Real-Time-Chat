@@ -10,7 +10,7 @@ export const MESSAGE_MIN_LENGTH = 1;
 export const MESSAGE_MAX_LENGTH = 500;
 export const MESSAGE_LIST_DEFAULT_LIMIT = 30;
 export const MESSAGE_LIST_MAX_LIMIT = 100;
-export const MESSAGE_TYPES = ["text", "attachment"] as const;
+export const MESSAGE_TYPES = ["text", "attachment", "audio"] as const;
 
 const AttachmentSchema = new Schema({
   fileId: { type: Schema.Types.ObjectId, required: true },

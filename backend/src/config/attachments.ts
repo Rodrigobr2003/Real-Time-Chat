@@ -56,6 +56,7 @@ export const ATTACHMENT_CATEGORIES: AttachmentCategory[] = [
       wav: "audio/wav",
       ogg: "audio/ogg",
       m4a: "audio/mp4",
+      weba: "audio/webm",
     },
   },
   {
